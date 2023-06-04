@@ -44,11 +44,11 @@ class VehicleHandler:
         self.last_car_activity = None
         self.force_update = True
         self.is_charging_on_openwb = False
-        if vin_info.vin in configuration.abrp_token_map:
-            abrp_user_token = configuration.abrp_token_map[vin_info.vin]
+        if vin_info.vin in self.configuration.abrp_token_map:
+            abrp_user_token = self.configuration.abrp_token_map[vin_info.vin]
         else:
             abrp_user_token = None
-        self.abrp_api = AbrpApi(configuration.abrp_api_key, abrp_user_token)
+        self.abrp_api = AbrpApi(self.configuration.abrp_api_key, abrp_user_token)
         self.vehicle_prefix = f'{self.configuration.saic_user}/vehicles/{self.vin_info.vin}'
         self.refresh_mode = 'periodic'
         self.inactive_refresh_interval = -1
@@ -649,7 +649,8 @@ def process_arguments() -> Configuration:
                             dest='open_wp_lp_map', required=False, action=EnvDefault, envvar='OPENWB_LP_MAP')
         parser.add_argument('--saic-relogin-delay', help='How long to wait before attempting another login to the SAIC '
                                                          'API. Environment Variable: SAIC_RELOGIN_DELAY',
-                            dest='saic_relogin_delay', required=False, action=EnvDefault, envvar='SAIC_RELOGIN_DELAY')
+                            dest='saic_relogin_delay', required=False, action=EnvDefault, envvar='SAIC_RELOGIN_DELAY',
+                            type=check_positive)
         args = parser.parse_args()
         config.mqtt_user = args.mqtt_user
         config.mqtt_password = args.mqtt_password
@@ -711,7 +712,8 @@ def check_positive(value):
     return ivalue
 
 
-configuration = process_arguments()
+if __name__ == '__main__':
+    configuration = process_arguments()
 
-mqtt_gateway = MqttGateway(configuration)
-mqtt_gateway.run()
+    mqtt_gateway = MqttGateway(configuration)
+    mqtt_gateway.run()
