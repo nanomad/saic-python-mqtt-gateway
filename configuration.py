@@ -19,4 +19,4 @@ class Configuration:
         self.messages_request_interval = 60  # in seconds
         # Switch this to true to check the car status for each message retrieved from the car, even if the message is
         # in the past
-        self.ignore_message_timestamp = False
+        self.ignore_vehicle_start_message_timestamp = False
