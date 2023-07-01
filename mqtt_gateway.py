@@ -209,7 +209,7 @@ class VehicleHandler:
 
     def force_update_by_message_time(self, message: SaicMessage):
         # something happened, better check the vehicle state
-        if self.last_car_activity < message.message_time:
+        if self.last_car_activity < message.message_time or self.configuration.ignore_message_timestamp:
             self.force_update = True
 
     def update_vehicle_status(self) -> OtaRvmVehicleStatusResp25857:
@@ -652,6 +652,11 @@ def process_arguments() -> Configuration:
                                                          'API. Environment Variable: SAIC_RELOGIN_DELAY',
                             dest='saic_relogin_delay', required=False, action=EnvDefault, envvar='SAIC_RELOGIN_DELAY',
                             type=check_positive)
+        parser.add_argument('--ignore-message-timestamp', help='Ignore message timestamps. Useful when the SAIC API '
+                                                                'has a significant clock skew. Environment Variable: '
+                                                                'IGNORE_MESSAGE_TIMESTAMP',
+                            dest='ignore_message_timestamp', required=False, action=EnvDefault,
+                            envvar='IGNORE_MESSAGE_TIMESTAMP', type=str_to_bool, default=False)
         args = parser.parse_args()
         config.mqtt_user = args.mqtt_user
         config.mqtt_password = args.mqtt_password
@@ -686,6 +691,8 @@ def process_arguments() -> Configuration:
 
         config.mqtt_host = str(parse_result.hostname)
 
+        config.ignore_message_timestamp = args.ignore_message_timestamp
+
         return config
     except argparse.ArgumentError as err:
         parser.print_help()
@@ -704,6 +711,14 @@ def cfg_value_to_dict(cfg_value: str, result_map: dict):
             key = key_value_pair[0]
             value = key_value_pair[1]
             result_map[key] = value
+
+def str_to_bool(value):
+    lowercase_value = value.lower()
+    if lowercase_value in {'false', 'f', '0', 'no', 'n'}:
+        return False
+    elif lowercase_value in {'true', 't', '1', 'yes', 'y'}:
+        return True
+    raise ValueError(f'{value} is not a valid boolean value')
 
 
 def check_positive(value):
