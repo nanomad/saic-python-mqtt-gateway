@@ -1,4 +1,4 @@
-saic-ismart-client-ng~=0.0.1
+saic-ismart-client-ng @ git+https://github.com/SAIC-iSmart-API/saic-python-client-ng@master
 httpx==0.26.0
 gmqtt~=0.6.13
 inflection~=0.5.1
