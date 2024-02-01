@@ -27,8 +27,8 @@ from exceptions import MqttGatewayException
 from integrations.abrp import AbrpApi, AbrpApiException
 from integrations.home_assistant import HomeAssistantDiscovery
 from integrations.openwb import ChargingStation
-from mqtt_publisher import MqttClient, MqttCommandListener
 from publisher import Publisher
+from publisher.mqtt import MqttClientPublisher, MqttCommandListener
 from saic_api_listener import MqttGatewaySaicApiListener
 from vehicle import RefreshMode, VehicleState
 
@@ -372,7 +372,7 @@ class MqttGateway(MqttCommandListener):
     def __init__(self, config: Configuration):
         self.configuration = config
         self.vehicle_handler: dict[str, VehicleHandler] = {}
-        self.publisher = MqttClient(self.configuration)
+        self.publisher = MqttClientPublisher(self.configuration)
         self.publisher.command_listener = self
         username_is_email = "@" in self.configuration.saic_user
         self.saic_api = SaicApi(

@@ -1,3 +1,4 @@
+import datetime
 import logging
 
 from configuration import Configuration
@@ -7,7 +8,7 @@ LOG = logging.getLogger(__name__)
 LOG.setLevel(level="DEBUG")
 
 
-class Logger(Publisher):
+class LoggerPublisher(Publisher):
     def __init__(self, configuration: Configuration):
         super().__init__(configuration)
 
@@ -25,3 +26,6 @@ class Logger(Publisher):
 
     def publish_float(self, key: str, value: float, no_prefix: bool = False) -> None:
         LOG.debug(f'{key}: {value}')
+
+    def keep_alive(self):
+        self.publish_str('keep_alive', datetime.datetime.now().isoformat())

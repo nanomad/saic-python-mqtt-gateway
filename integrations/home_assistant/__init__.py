@@ -7,7 +7,7 @@ from saic_ismart_client_ng.api.vehicle.schema import VinInfo
 from saic_ismart_client_ng.api.vehicle_charging import ChargeCurrentLimitCode, ScheduledChargingMode
 
 import mqtt_topics
-from mqtt_publisher import MqttClient
+from publisher.mqtt import MqttClientPublisher
 from vehicle import VehicleState, RefreshMode
 
 PAYLOAD_NOT_AVAILABLE = 'payload_not_available'
@@ -466,14 +466,14 @@ class HomeAssistantDiscovery:
 
     def __get_system_topic(self, topic: str) -> str:
         publisher = self.__vehicle_state.publisher
-        if isinstance(publisher, MqttClient):
+        if isinstance(publisher, MqttClientPublisher):
             return publisher.get_topic(topic, no_prefix=False)
         return topic
 
     def __get_vehicle_topic(self, topic: str) -> str:
         vehicle_topic = self.__vehicle_state.get_topic(topic)
         publisher = self.__vehicle_state.publisher
-        if isinstance(publisher, MqttClient):
+        if isinstance(publisher, MqttClientPublisher):
             return publisher.get_topic(vehicle_topic, no_prefix=False)
         return vehicle_topic
 

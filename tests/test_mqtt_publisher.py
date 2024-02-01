@@ -1,7 +1,7 @@
 import unittest
 
 from configuration import Configuration, TransportProtocol
-from mqtt_publisher import MqttClient, MqttCommandListener
+from publisher.mqtt import MqttClientPublisher, MqttCommandListener
 
 USER = 'me@home.da'
 VIN = 'vin10000000000000'
@@ -21,7 +21,7 @@ class TestMqttPublisher(unittest.IsolatedAsyncioTestCase, MqttCommandListener):
         config.mqtt_topic = 'saic'
         config.saic_user = 'user+a#b*c>d$e'
         config.mqtt_transport_protocol = TransportProtocol.TCP
-        self.mqtt_client = MqttClient(config)
+        self.mqtt_client = MqttClientPublisher(config)
         self.mqtt_client.command_listener = self
         self.received_vin = ''
         self.received_payload = ''

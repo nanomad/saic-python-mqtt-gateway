@@ -1,14 +1,14 @@
+import datetime
 import json
 import re
+from abc import ABC
 
-import mqtt_topics
 from configuration import Configuration
 
 
-class Publisher:
+class Publisher(ABC):
     def __init__(self, config: Configuration):
         self.configuration = config
-        self.mode_by_vin = {}
         self.map = {}
 
     def publish_json(self, key: str, data: dict, no_prefix: bool = False) -> None:
@@ -66,7 +66,7 @@ class Publisher:
         return data
 
     def keepalive(self):
-        self.publish_str(mqtt_topics.INTERNAL_LWT, 'online', False)
+        self.map['keepalive'] = datetime.datetime.now()
 
     @staticmethod
     def anonymize_str(value: str) -> str:

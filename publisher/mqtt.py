@@ -23,7 +23,7 @@ class MqttCommandListener(ABC):
         raise NotImplementedError("Should have implemented this")
 
 
-class MqttClient(Publisher):
+class MqttClientPublisher(Publisher):
     def __init__(self, configuration: Configuration):
         super().__init__(configuration)
         self.configuration = configuration
@@ -53,7 +53,7 @@ class MqttClient(Publisher):
         self.client = mqtt_client
 
     def get_mqtt_account_prefix(self) -> str:
-        return MqttClient.remove_special_mqtt_characters(
+        return MqttClientPublisher.remove_special_mqtt_characters(
             f'{self.configuration.mqtt_topic}/{self.configuration.saic_user}')
 
     @staticmethod
@@ -194,3 +194,6 @@ class MqttClient(Publisher):
                 return True
         else:
             return True
+
+    def keepalive(self):
+        self.publish_str(mqtt_topics.INTERNAL_LWT, 'online', False)
