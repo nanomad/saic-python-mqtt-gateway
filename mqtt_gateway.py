@@ -22,11 +22,11 @@ from saic_ismart_client_ng.exceptions import SaicApiException
 from saic_ismart_client_ng.model import SaicApiConfiguration
 
 import mqtt_topics
-from abrp_api import AbrpApi, AbrpApiException
 from charging_station import ChargingStation
 from configuration import Configuration, TransportProtocol
 from exceptions import MqttGatewayException
 from home_assistant_discovery import HomeAssistantDiscovery
+from integrations.abrp import AbrpApi, AbrpApiException
 from mqtt_publisher import MqttClient, MqttCommandListener
 from publisher import Publisher
 from saic_api_listener import MqttGatewaySaicApiListener
