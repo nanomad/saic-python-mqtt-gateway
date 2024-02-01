@@ -7,8 +7,8 @@ from typing import Optional
 import gmqtt
 
 import mqtt_topics
-from charging_station import ChargingStation
 from configuration import Configuration
+from integrations.openwb import ChargingStation
 from publisher import Publisher
 
 LOG = logging.getLogger(__name__)
