@@ -1,15 +1,25 @@
-FROM python:3.12-slim
+# Dummy step to lock the python version once
+FROM python:3.12-slim as base
 
+# Build a virtualenv using the appropriate Debian release
+# * Install python3-venv for the built-in Python3 venv module (not installed by default)
+# * Install gcc libpython3-dev to compile C Python modules
+# * In the virtualenv: Update pip setuputils and wheel to support building new packages
+FROM base AS build
+RUN apt-get update && \
+    apt-get install --no-install-suggests --no-install-recommends --yes python3-venv gcc libpython3-dev && \
+    python3 -m venv /venv && \
+    /venv/bin/pip install --upgrade pip setuptools wheel
+
+# Build the virtualenv as a separate step: Only re-execute this step when requirements.txt changes
+FROM build AS build-venv
+COPY requirements.txt /requirements.txt
+RUN /venv/bin/pip install --disable-pip-version-check -r /requirements.txt
+
+# Copy the virtualenv into the final image
+FROM base
+COPY --from=build-venv /venv /venv
 WORKDIR /usr/src/app
-
-COPY requirements.txt ./
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends gcc python3-dev \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip install --no-cache-dir -r requirements.txt \
-    && apt-get purge -y --auto-remove gcc python3-dev
-# the --no-install-recommends helps limit some of the install so that you can be more explicit about what gets installed
-
 COPY . .
 
-CMD [ "python", "./mqtt_gateway.py"]
+ENTRYPOINT ["/venv/bin/python3", "mqtt_gateway.py"]
