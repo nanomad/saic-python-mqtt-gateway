@@ -109,25 +109,27 @@ class VehicleHandler:
                 except SaicApiException as e:
                     self.vehicle_state.mark_failed_refresh()
                     LOG.exception(
-                        'handle_vehicle loop failed during SAIC API call. Waiting 30s before retrying',
+                        'handle_vehicle loop failed during SAIC API call',
                         exc_info=e
                     )
-                    await asyncio.sleep(float(30))
                 except AbrpApiException as ae:
                     LOG.exception('handle_vehicle loop failed during ABRP API call', exc_info=ae)
                 except Exception as e:
                     self.vehicle_state.mark_failed_refresh()
                     LOG.exception(
-                        'handle_vehicle loop failed with an unexpected exception. Waiting 30s before retrying',
+                        'handle_vehicle loop failed with an unexpected exception',
                         exc_info=e
                     )
-                    await asyncio.sleep(float(30))
                 finally:
                     if self.configuration.ha_discovery_enabled:
                         self.ha_discovery.publish_ha_discovery_messages()
             else:
                 # car not active, wait a second
                 await asyncio.sleep(1.0)
+
+    async def sleep_for_failure(self, fail_counter):
+        wait_time = min(((2**(fail_counter-1))+30), 60*60)
+        await asyncio.sleep(float(wait_time))
 
     async def __refresh_abrp(self, charge_status, vehicle_status):
         abrp_refreshed, abrp_response = await self.abrp_api.update_abrp(vehicle_status, charge_status)
