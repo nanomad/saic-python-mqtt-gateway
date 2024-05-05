@@ -1,14 +1,14 @@
 import logging
 import os
 import ssl
-from abc import ABC
-from typing import Optional, override
+from typing import Optional, List, override
 
 import gmqtt
 
 import mqtt_topics
 from configuration import Configuration
-from integrations.openwb.charging_station import ChargingStation
+from integrations import SaicMqttGatewayIntegration, SaicMqttGatewayIntegrationException
+from publisher.core import MqttCommandListener
 from publisher.core import Publisher
 
 LOG = logging.getLogger(__name__)
@@ -16,14 +16,6 @@ LOG.setLevel(level=os.getenv('LOG_LEVEL', 'INFO').upper())
 
 MQTT_LOG = logging.getLogger(gmqtt.__name__)
 MQTT_LOG.setLevel(level=os.getenv('MQTT_LOG_LEVEL', 'INFO').upper())
-
-
-class MqttCommandListener(ABC):
-    async def on_mqtt_command_received(self, *, vin: str, topic: str, payload: str) -> None:
-        raise NotImplementedError("Should have implemented this")
-
-    async def on_charging_detected(self, vin: str) -> None:
-        raise NotImplementedError("Should have implemented this")
 
 
 class MqttClient(Publisher):
@@ -37,9 +29,7 @@ class MqttClient(Publisher):
         self.port = self.configuration.mqtt_port
         self.transport_protocol = self.configuration.mqtt_transport_protocol
         self.command_listener: Optional[MqttCommandListener] = None
-        self.vin_by_charge_state_topic: dict[str, str] = {}
-        self.last_charge_state_by_vin: [str, str] = {}
-        self.vin_by_charger_connected_topic: dict[str, str] = {}
+        self.integrations: List[SaicMqttGatewayIntegration] = []
 
         mqtt_client = gmqtt.Client(
             client_id=str(self.publisher_id),
@@ -122,27 +112,33 @@ class MqttClient(Publisher):
             LOG.exception(f'Error while processing MQTT message: {e}')
 
     async def __on_message_real(self, *, topic: str, payload: str) -> None:
-        if topic in self.vin_by_charge_state_topic:
+        if await self.__handle_raw_mqtt_message_integrations(topic, payload):
             LOG.debug(f'Received message over topic {topic} with payload {payload}')
-            vin = self.vin_by_charge_state_topic[topic]
-            charging_station = self.configuration.charging_stations_by_vin[vin]
-            if self.should_force_refresh(payload, charging_station):
-                LOG.info(f'Vehicle with vin {vin} is charging. Setting refresh mode to force')
-                if self.command_listener is not None:
-                    await self.command_listener.on_charging_detected(vin)
-        elif topic in self.vin_by_charger_connected_topic:
-            LOG.debug(f'Received message over topic {topic} with payload {payload}')
-            vin = self.vin_by_charger_connected_topic[topic]
-            charging_station = self.configuration.charging_stations_by_vin[vin]
-            if payload == charging_station.connected_value:
-                LOG.debug(f'Vehicle with vin {vin} is connected to its charging station')
-            else:
-                LOG.debug(f'Vehicle with vin {vin} is disconnected from its charging station')
         else:
             vin = self.get_vin_from_topic(topic)
             if self.command_listener is not None:
                 await self.command_listener.on_mqtt_command_received(vin=vin, topic=topic, payload=payload)
         return
+
+    async def __handle_raw_mqtt_message_integrations(self, topic, payload) -> bool:
+        topic = str(topic)
+        payload = str(payload)
+        success = False
+        for integration in self.integrations:
+            try:
+                integration_refreshed, integration_response = await integration.on_raw_mqtt_message(
+                    topic=topic,
+                    payload=payload
+                )
+                if integration_refreshed:
+                    LOG.info(f'Handling RAW MQTT message on {topic} in integration {integration.name} succeeded...')
+                    success = True
+            except SaicMqttGatewayIntegrationException as ae:
+                LOG.exception(
+                    f'handle_vehicle loop failed during Handling MQTT command {topic} integration {integration.name} processing call',
+                    exc_info=ae
+                )
+        return success
 
     def publish(self, topic: str, payload) -> None:
         self.client.publish(self.remove_special_mqtt_characters(topic), payload, retain=True)
@@ -187,20 +183,3 @@ class MqttClient(Publisher):
         global_topic_removed = topic[len(self.configuration.mqtt_topic) + 1:]
         elements = global_topic_removed.split('/')
         return elements[2]
-
-    def should_force_refresh(self, current_charging_value: str, charging_station: ChargingStation):
-        vin = charging_station.vin
-        last_charging_value: str | None = None
-        if vin in self.last_charge_state_by_vin:
-            last_charging_value = self.last_charge_state_by_vin[vin]
-        self.last_charge_state_by_vin[vin] = current_charging_value
-
-        if last_charging_value:
-            if last_charging_value == current_charging_value:
-                LOG.debug('Last charging value equals current charging value. No refresh needed.')
-                return False
-            else:
-                LOG.info(f'Charging value has changed from {last_charging_value} to {current_charging_value}.')
-                return True
-        else:
-            return True

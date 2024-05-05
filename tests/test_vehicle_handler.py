@@ -171,7 +171,7 @@ class TestVehicleHandler(unittest.IsolatedAsyncioTestCase):
         account_prefix = f'/vehicles/{VIN}'
         scheduler = BlockingScheduler()
         vehicle_state = VehicleState(publisher, scheduler, account_prefix, vin_info)
-        self.vehicle_handler = VehicleHandler(config, saicapi, publisher, vin_info, vehicle_state)
+        self.vehicle_handler = VehicleHandler(config, [], saicapi, publisher, vin_info, vehicle_state)
 
     @patch.object(SaicApi, 'get_vehicle_status')
     async def test_update_vehicle_status(self, mocked_vehicle_status):

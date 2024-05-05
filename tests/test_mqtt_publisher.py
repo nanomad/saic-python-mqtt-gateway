@@ -2,7 +2,8 @@ import unittest
 from typing import override
 
 from configuration import Configuration, TransportProtocol
-from publisher.mqtt_publisher import MqttClient, MqttCommandListener
+from publisher.core import MqttCommandListener
+from publisher.mqtt_publisher import MqttClient
 
 USER = 'me@home.da'
 VIN = 'vin10000000000000'

@@ -6,6 +6,14 @@ import mqtt_topics
 from configuration import Configuration
 
 
+class MqttCommandListener(ABC):
+    async def on_mqtt_command_received(self, *, vin: str, topic: str, payload: str) -> None:
+        raise NotImplementedError("Should have implemented this")
+
+    async def on_charging_detected(self, vin: str) -> None:
+        raise NotImplementedError("Should have implemented this")
+
+
 class Publisher(ABC):
     def __init__(self, config: Configuration):
         self.configuration = config

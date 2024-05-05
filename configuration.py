@@ -1,7 +1,5 @@
 from enum import Enum
 
-from integrations.openwb.charging_station import ChargingStation
-
 
 class TransportProtocol(Enum):
     def __init__(self, transport_mechanism: str, with_tls: bool):
@@ -33,7 +31,7 @@ class Configuration:
         self.mqtt_password: str | None = None
         self.mqtt_client_id: str = 'saic-python-mqtt-gateway'
         self.mqtt_topic: str | None = None
-        self.charging_stations_by_vin: dict[str, ChargingStation] = {}
+        self.charging_stations_file: str | None = None
         self.anonymized_publishing: bool = False
         self.messages_request_interval: int = 60  # in seconds
         self.ha_discovery_enabled: bool = True

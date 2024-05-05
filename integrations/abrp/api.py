@@ -11,12 +11,16 @@ from saic_ismart_client_ng.api.vehicle.schema import BasicVehicleStatus
 from saic_ismart_client_ng.api.vehicle_charging import ChrgMgmtDataResp
 from saic_ismart_client_ng.api.vehicle_charging.schema import RvsChargeStatus
 
+from configuration import Configuration
+from integrations import SaicMqttGatewayIntegration, SaicMqttGatewayIntegrationException
+from integrations.abrp.api_listener import MqttGatewayAbrpListener
+from publisher.core import MqttCommandListener, Publisher
 from utils import value_in_range
 
 LOG = logging.getLogger(__name__)
 
 
-class AbrpApiException(Exception):
+class AbrpApiException(SaicMqttGatewayIntegrationException):
     def __init__(self, msg: str):
         self.message = msg
 
@@ -24,35 +28,34 @@ class AbrpApiException(Exception):
         return self.message
 
 
-class AbrpApiListener(ABC):
-    async def on_request(self, path: str, body: Optional[str] = None, headers: Optional[dict] = None):
-        pass
-
-    async def on_response(self, path: str, body: Optional[str] = None, headers: Optional[dict] = None):
-        pass
-
-
-class AbrpApi:
-    def __init__(self, abrp_api_key: str, abrp_user_token: str, listener: Optional[AbrpApiListener] = None) -> None:
-        self.abrp_api_key = abrp_api_key
-        self.abrp_user_token = abrp_user_token
-        self.__listener = listener
+class AbrpApi(SaicMqttGatewayIntegration):
+    def __init__(self, *, configuration: Configuration, publisher: Publisher, listener: MqttCommandListener):
+        super().__init__(name='ABRP', configuration=configuration, publisher=publisher, listener=listener)
+        self.__abrp_token_map = self.configuration.abrp_token_map
+        self.__abrp_api_key = self.configuration.abrp_api_key
         self.__base_uri = 'https://api.iternio.com/1/'
-        self.client = httpx.AsyncClient(
+        self.__listener = MqttGatewayAbrpListener(self.publisher)
+        self.__client = httpx.AsyncClient(
             event_hooks={
                 "request": [self.invoke_request_listener],
                 "response": [self.invoke_response_listener]
             }
         )
 
-    async def update_abrp(self, vehicle_status: VehicleStatusResp, charge_info: ChrgMgmtDataResp) \
-            -> Tuple[bool, Any | None]:
+    async def on_full_refresh_done(
+            self,
+            *,
+            vin: str,
+            vehicle_status: VehicleStatusResp,
+            charge_info: ChrgMgmtDataResp
+    ) -> Tuple[bool, Any | None]:
 
+        abrp_user_token = self.__get_user_token(vin)
         charge_status = None if charge_info is None else charge_info.chrgMgmtData
 
         if (
-                self.abrp_api_key is not None
-                and self.abrp_user_token is not None
+                self.__abrp_api_key is not None
+                and abrp_user_token is not None
                 and vehicle_status is not None
                 and charge_status is not None
         ):
@@ -95,12 +98,12 @@ class AbrpApi:
                 data.update(self.__extract_gps_position(gps_position))
 
             headers = {
-                'Authorization': f'APIKEY {self.abrp_api_key}'
+                'Authorization': f'APIKEY {self.__abrp_api_key}'
             }
 
             try:
-                response = await self.client.post(url=tlm_send_url, headers=headers, params={
-                    'token': self.abrp_user_token,
+                response = await self.__client.post(url=tlm_send_url, headers=headers, params={
+                    'token': abrp_user_token,
                     'tlm': json.dumps(data)
                 })
                 await response.aread()
@@ -242,3 +245,9 @@ class AbrpApi:
             )
         except Exception as e:
             LOG.warning(f"Error invoking request listener: {e}", exc_info=e)
+
+    def __get_user_token(self, vin: str):
+        if vin in self.__abrp_token_map:
+            return self.__abrp_token_map[vin]
+        else:
+            return None
