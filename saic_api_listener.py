@@ -7,8 +7,7 @@ from urllib.parse import urlparse
 
 from saic_ismart_client_ng.listener import SaicApiListener
 
-from integrations.abrp.api import AbrpApiListener
-from mqtt_topics import INTERNAL_API, INTERNAL_ABRP
+from mqtt_topics import INTERNAL_API
 from publisher.core import Publisher
 
 LOG = logging.getLogger(__name__)
@@ -67,19 +66,6 @@ class MqttGatewayListenerApiListener(ABC):
             )
         else:
             LOG.info(f"Not publishing API response to MQTT since publisher is not connected. {data}")
-
-
-class MqttGatewayAbrpListener(AbrpApiListener, MqttGatewayListenerApiListener):
-    def __init__(self, publisher: Publisher):
-        super().__init__(publisher, INTERNAL_ABRP)
-
-    @override
-    async def on_request(self, path: str, body: Optional[str] = None, headers: Optional[dict] = None):
-        await self.publish_request(path, body, headers)
-
-    @override
-    async def on_response(self, path: str, body: Optional[str] = None, headers: Optional[dict] = None):
-        await self.publish_response(path, body, headers)
 
 
 class MqttGatewaySaicApiListener(SaicApiListener, MqttGatewayListenerApiListener):

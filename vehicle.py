@@ -19,7 +19,6 @@ from saic_ismart_client_ng.api.vehicle_charging import ChrgMgmtDataResp, TargetB
 from saic_ismart_client_ng.api.vehicle_charging.schema import ChrgMgmtData
 
 import mqtt_topics
-from integrations.openwb.charging_station import ChargingStation
 from exceptions import MqttGatewayException
 from publisher.core import Publisher
 from utils import value_in_range, is_valid_temperature
@@ -48,14 +47,12 @@ class VehicleState:
             scheduler: BaseScheduler,
             account_prefix: str,
             vin_info: VinInfo,
-            charging_station: Optional[ChargingStation] = None,
             charge_polling_min_percent: float = 1.0,
             total_battery_capacity: Optional[float] = None,
     ):
         self.publisher = publisher
         self.__vin_info = vin_info
         self.mqtt_vin_prefix = f'{account_prefix}'
-        self.charging_station = charging_station
         self.last_car_activity = datetime.datetime.min
         self.last_successful_refresh = datetime.datetime.min
         self.__last_failed_refresh: datetime.datetime | None = None
@@ -351,11 +348,6 @@ class VehicleState:
         if value_in_range(raw_value, 1, 65535):
             electric_range = raw_value / 10.0
             self.publisher.publish_float(self.get_topic(mqtt_topics.DRIVETRAIN_RANGE), electric_range)
-            if (
-                    self.charging_station
-                    and self.charging_station.range_topic
-            ):
-                self.publisher.publish_float(self.charging_station.range_topic, electric_range, True)
 
     def set_hv_battery_active(self, hv_battery_active: bool):
         if (
@@ -532,7 +524,7 @@ class VehicleState:
                 f"initial gateway startup from an invalid state {self.refresh_mode}"
             )
 
-    async def configure_by_message(self, *, topic: str, payload: str):
+    async def handle_mqtt_command(self, *, topic: str, payload: str) -> bool:
         payload = payload.lower()
         match topic:
             case mqtt_topics.REFRESH_MODE:
@@ -566,7 +558,8 @@ class VehicleState:
                 except ValueError:
                     raise MqttGatewayException(f'Error setting value for payload {payload}')
             case _:
-                raise MqttGatewayException(f'Unsupported topic {topic}')
+                return False
+        return True
 
     def handle_charge_status(self, charge_info_resp: ChrgMgmtDataResp) -> None:
         charge_mgmt_data = charge_info_resp.chrgMgmtData
@@ -636,11 +629,6 @@ class VehicleState:
         soc = charge_mgmt_data.bmsPackSOCDsp / 10.0
         if soc <= 100.0:
             self.publisher.publish_float(self.get_topic(mqtt_topics.DRIVETRAIN_SOC), soc)
-            if (
-                    self.charging_station
-                    and self.charging_station.soc_topic
-            ):
-                self.publisher.publish_int(self.charging_station.soc_topic, int(soc), True)
 
         estd_elec_rng = charge_mgmt_data.bmsEstdElecRng
         if value_in_range(estd_elec_rng, 0, 65535) and estd_elec_rng != 2047:

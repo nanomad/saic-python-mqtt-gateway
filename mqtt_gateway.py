@@ -9,7 +9,7 @@ import signal
 import sys
 import time
 import urllib.parse
-from typing import Callable, override
+from typing import Callable, List, override
 
 import apscheduler.schedulers.asyncio
 from saic_ismart_client_ng import SaicApi
@@ -25,16 +25,16 @@ from saic_ismart_client_ng.model import SaicApiConfiguration
 import mqtt_topics
 from configuration import Configuration, TransportProtocol
 from exceptions import MqttGatewayException
-from integrations.abrp.api import AbrpApi, AbrpApiException
+from integrations import SaicMqttGatewayIntegration, SaicMqttGatewayIntegrationException
+from integrations.abrp.api import AbrpApi
 from integrations.home_assistant.discovery import HomeAssistantDiscovery
-from integrations.openwb.charging_station import ChargingStation
+from integrations.openwb import OpenWBIntegration
 from publisher.core import Publisher
 from publisher.mqtt_publisher import MqttClient, MqttCommandListener
-from saic_api_listener import MqttGatewaySaicApiListener, MqttGatewayAbrpListener
+from saic_api_listener import MqttGatewaySaicApiListener
 from vehicle import RefreshMode, VehicleState
 
 MSG_CMD_SUCCESSFUL = 'Success'
-CHARGING_STATIONS_FILE = 'charging-stations.json'
 
 
 def epoch_value_to_str(time_value: int) -> str:
@@ -58,8 +58,15 @@ def debug_log_enabled():
 
 
 class VehicleHandler:
-    def __init__(self, config: Configuration, saicapi: SaicApi, publisher: Publisher, vin_info: VinInfo,
-                 vehicle_state: VehicleState):
+    def __init__(
+            self,
+            config: Configuration,
+            integrations: List[SaicMqttGatewayIntegration],
+            saicapi: SaicApi,
+            publisher: Publisher,
+            vin_info: VinInfo,
+            vehicle_state: VehicleState
+    ):
         self.configuration = config
         self.saic_api = saicapi
         self.publisher = publisher
@@ -67,15 +74,7 @@ class VehicleHandler:
         self.vehicle_prefix = f'{self.configuration.saic_user}/vehicles/{self.vin_info.vin}'
         self.vehicle_state = vehicle_state
         self.ha_discovery = HomeAssistantDiscovery(vehicle_state, vin_info, config)
-        if vin_info.vin in self.configuration.abrp_token_map:
-            abrp_user_token = self.configuration.abrp_token_map[vin_info.vin]
-        else:
-            abrp_user_token = None
-        self.abrp_api = AbrpApi(
-            self.configuration.abrp_api_key,
-            abrp_user_token,
-            listener=MqttGatewayAbrpListener(self.publisher)
-        )
+        self.__integrations = integrations
 
     async def handle_vehicle(self) -> None:
         start_time = datetime.datetime.now()
@@ -109,7 +108,7 @@ class VehicleHandler:
                     self.vehicle_state.mark_successful_refresh()
                     LOG.info('Refreshing vehicle status succeeded...')
 
-                    await self.__refresh_abrp(charge_status, vehicle_status)
+                    await self.__refresh_integrations(charge_status, vehicle_status)
 
                 except SaicApiException as e:
                     self.vehicle_state.mark_failed_refresh()
@@ -117,8 +116,7 @@ class VehicleHandler:
                         'handle_vehicle loop failed during SAIC API call',
                         exc_info=e
                     )
-                except AbrpApiException as ae:
-                    LOG.exception('handle_vehicle loop failed during ABRP API call', exc_info=ae)
+
                 except Exception as e:
                     self.vehicle_state.mark_failed_refresh()
                     LOG.exception(
@@ -132,13 +130,52 @@ class VehicleHandler:
                 # car not active, wait a second
                 await asyncio.sleep(1.0)
 
-    async def __refresh_abrp(self, charge_status, vehicle_status):
-        abrp_refreshed, abrp_response = await self.abrp_api.update_abrp(vehicle_status, charge_status)
-        self.publisher.publish_str(f'{self.vehicle_prefix}/{mqtt_topics.INTERNAL_ABRP}', abrp_response)
-        if abrp_refreshed:
-            LOG.info('Refreshing ABRP status succeeded...')
-        else:
-            LOG.info(f'ABRP not refreshed, reason {abrp_response}')
+    async def __refresh_integrations(self, charge_status, vehicle_status):
+        for integration in self.__integrations:
+            try:
+                integration_refreshed, integration_response = await integration.on_full_refresh_done(
+                    vin=self.vin_info.vin,
+                    vehicle_status=vehicle_status,
+                    charge_info=charge_status
+                )
+                self.publisher.publish_str(
+                    f'{self.vehicle_prefix}/{mqtt_topics.INTERNAL}/{integration.name}/full_refresh',
+                    integration_response
+                )
+                if integration_refreshed:
+                    LOG.info(f'Refreshing integration {integration.name} status succeeded...')
+                else:
+                    LOG.info(f'Integration {integration.name} not refreshed, reason {integration_response}')
+            except SaicMqttGatewayIntegrationException as ae:
+                LOG.exception(
+                    f'handle_vehicle loop failed during integration {integration.name} processing call',
+                    exc_info=ae
+                )
+
+    async def __handle_mqtt_command_in_integrations(self, topic, payload) -> bool:
+        topic = str(topic).lower()
+        payload = str(payload).lower()
+        success = False
+        for integration in self.__integrations:
+            try:
+                integration_refreshed, integration_response = await integration.on_mqtt_command(
+                    vin=self.vin_info.vin,
+                    topic=topic,
+                    payload=payload
+                )
+                self.publisher.publish_str(
+                    f'{self.vehicle_prefix}/{mqtt_topics.INTERNAL}/{integration.name}/mqtt',
+                    integration_response
+                )
+                if integration_refreshed:
+                    LOG.info(f'Handling MQTT command {topic} in integration {integration.name} succeeded...')
+                    success = True
+            except SaicMqttGatewayIntegrationException as ae:
+                LOG.exception(
+                    f'handle_vehicle loop failed during Handling MQTT command {topic} integration {integration.name} processing call',
+                    exc_info=ae
+                )
+        return success
 
     async def update_vehicle_status(self) -> VehicleStatusResp:
         LOG.info('Updating vehicle status')
@@ -387,8 +424,12 @@ class VehicleHandler:
 
                 case _:
                     # set mode, period (in)-active,...
+                    handled = await self.vehicle_state.handle_mqtt_command(topic=topic, payload=payload)
+                    if not handled:
+                        handled = self.__handle_mqtt_command_in_integrations(topic, payload)
+                    if not handled:
+                        raise MqttGatewayException(f'Unsupported topic {topic}')
                     should_force_refresh = False
-                    await self.vehicle_state.configure_by_message(topic=topic, payload=payload)
             self.publisher.publish_str(f'{self.vehicle_prefix}/{topic}/result', 'Success')
             if should_force_refresh:
                 self.vehicle_state.set_refresh_mode(RefreshMode.FORCE, f'after command execution on topic {topic}')
@@ -433,6 +474,11 @@ class MqttGateway(MqttCommandListener):
         )
         self.saic_api.on_publish_json_value = self.__on_publish_json_value
         self.saic_api.on_publish_raw_value = self.__on_publish_raw_value
+        self.integrations = [
+            OpenWBIntegration(configuration=configuration, publisher=self.publisher, listener=self),
+            AbrpApi(configuration=configuration, publisher=self.publisher, listener=self)
+        ]
+        self.publisher.integrations = self.integrations
 
     async def run(self):
         scheduler = apscheduler.schedulers.asyncio.AsyncIOScheduler()
@@ -462,32 +508,19 @@ class MqttGateway(MqttCommandListener):
                 raise SystemExit(e)
 
             account_prefix = f'{self.configuration.saic_user}/{mqtt_topics.VEHICLES}/{vin_info.vin}'
-            charging_station = self.get_charging_station(vin_info.vin)
-            if (
-                    charging_station
-                    and charging_station.soc_topic
-            ):
-                LOG.debug('SoC of %s for charging station will be published over MQTT topic: %s', vin_info.vin,
-                          charging_station.soc_topic)
-            if (
-                    charging_station
-                    and charging_station.range_topic
-            ):
-                LOG.debug('Range of %s for charging station will be published over MQTT topic: %s', vin_info.vin,
-                          charging_station.range_topic)
             total_battery_capacity = configuration.battery_capacity_map.get(vin_info.vin, None)
             vehicle_state = VehicleState(
                 self.publisher,
                 scheduler,
                 account_prefix,
                 vin_info,
-                charging_station,
                 charge_polling_min_percent=self.configuration.charge_dynamic_polling_min_percentage,
                 total_battery_capacity=total_battery_capacity,
             )
 
             vehicle_handler = VehicleHandler(
                 self.configuration,
+                self.integrations,
                 self.saic_api,
                 self.publisher,  # Gateway pointer
                 vin_info,
@@ -538,12 +571,6 @@ class MqttGateway(MqttCommandListener):
 
     def __on_publish_json_value(self, key: str, json_data: dict):
         self.publisher.publish_json(key, json_data)
-
-    def get_charging_station(self, vin) -> ChargingStation | None:
-        if vin in self.configuration.charging_stations_by_vin:
-            return self.configuration.charging_stations_by_vin[vin]
-        else:
-            return None
 
     async def __main_loop(self):
         tasks = []
@@ -821,11 +848,7 @@ def process_arguments() -> Configuration:
                 config.battery_capacity_map,
                 value_type=check_positive_float
             )
-        if args.charging_stations_file:
-            process_charging_stations_file(config, args.charging_stations_file)
-        else:
-            process_charging_stations_file(config, f'./{CHARGING_STATIONS_FILE}')
-
+        config.charging_stations_file = args.charging_stations_file
         config.saic_password = args.saic_password
 
         if args.ha_discovery_enabled is not None:
@@ -870,32 +893,6 @@ def process_arguments() -> Configuration:
     except argparse.ArgumentError as err:
         parser.print_help()
         SystemExit(err)
-
-
-def process_charging_stations_file(config: Configuration, json_file: str):
-    try:
-        with open(json_file, 'r') as f:
-            data = json.load(f)
-
-            for item in data:
-                charge_state_topic = item['chargeStateTopic']
-                charging_value = item['chargingValue']
-                vin = item['vin']
-                if 'socTopic' in item:
-                    charging_station = ChargingStation(vin, charge_state_topic, charging_value, item['socTopic'])
-                else:
-                    charging_station = ChargingStation(vin, charge_state_topic, charging_value)
-                if 'rangeTopic' in item:
-                    charging_station.range_topic = item['rangeTopic']
-                if 'chargerConnectedTopic' in item:
-                    charging_station.connected_topic = item['chargerConnectedTopic']
-                if 'chargerConnectedValue' in item:
-                    charging_station.connected_value = item['chargerConnectedValue']
-                config.charging_stations_by_vin[vin] = charging_station
-    except FileNotFoundError:
-        LOG.warning(f'File {json_file} does not exist')
-    except json.JSONDecodeError as e:
-        LOG.exception(f'Reading {json_file} failed', exc_info=e)
 
 
 def cfg_value_to_dict(cfg_value: str, result_map: dict, value_type: Callable[[str], any] = str):
