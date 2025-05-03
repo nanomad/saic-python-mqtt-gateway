@@ -5,8 +5,7 @@ from unittest import TestCase
 
 from saic_ismart_client_ng.api.schema import GpsPosition, GpsStatus
 from saic_ismart_client_ng.api.vehicle import VehicleStatusResp
-
-from utils import get_update_timestamp
+from saic_python_mqtt_gateway.utils import get_update_timestamp
 
 
 class Test(TestCase):

@@ -47,4 +47,4 @@ COPY --from=builder ${VIRTUAL_ENV} ${VIRTUAL_ENV}
 COPY src/ .
 COPY examples/ .
 
-CMD [ "python", "./main.py"]
+CMD [ "python", "-m", "saic_python_mqtt_gateway"]

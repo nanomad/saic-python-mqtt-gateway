@@ -47,15 +47,27 @@ jobs:
       - name: Install library
         run: poetry install --no-interaction
 
-      - name: Run tests with coverage
+      - name: Run mypy
         run: |
-          poetry run pytest tests --cov --junit-xml=junit/test-results-${{ matrix.python-version }}.xml
+          poetry run mypy
+        if: success() || failure()
 
       - name: Lint with Ruff
         run: |
           poetry run ruff check . --output-format=github
+        if: success() || failure()
         continue-on-error: true
         
+      - name: Lint with pylint
+        run: |
+          poetry run pylint src/**/*.py
+        if: success() || failure()
+        continue-on-error: true
+
+      - name: Run tests with coverage
+        run: |
+          poetry run pytest --cov --junit-xml=junit/test-results-${{ matrix.python-version }}.xml
+
       - name: Surface failing tests
         uses: pmeier/pytest-results-action@main
         with:

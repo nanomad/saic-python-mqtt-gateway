@@ -3,10 +3,10 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, override
 
-from publisher.log_publisher import ConsolePublisher
+from saic_python_mqtt_gateway.publisher.log_publisher import ConsolePublisher
 
 if TYPE_CHECKING:
-    from configuration import Configuration
+    from saic_python_mqtt_gateway.configuration import Configuration
 
 LOG = logging.getLogger(__name__)
 

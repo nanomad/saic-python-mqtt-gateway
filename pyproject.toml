@@ -51,15 +51,10 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 norecursedirs = ".git build dist"
-testpaths = "tests"
 pythonpath = [
-    "src",
-    "tests"
+    "src"
 ]
 mock_use_standalone_module = true
-addopts = [
-    "--import-mode=importlib",
-]
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.coverage.run]
@@ -141,6 +136,7 @@ fixture-parentheses = false
 [tool.ruff.lint.isort]
 combine-as-imports = true
 force-sort-within-sections = true
+known-first-party = ["saic_python_mqtt_gateway", "saic_ismart_client_ng"]
 required-imports = ["from __future__ import annotations"]
 
 
@@ -192,11 +188,11 @@ ignore_missing_imports = true
 follow_untyped_imports = true
 
 [[tool.mypy.overrides]]
-module = ["publisher.mqtt_publisher"]
+module = ["saic_python_mqtt_gateway.publisher.mqtt_publisher"]
 disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]
-module = ["configuration.argparse_extensions"]
+module = ["saic_python_mqtt_gateway.configuration.argparse_extensions"]
 disable_error_code = ["arg-type"]
 
 [tool.pylint.MAIN]

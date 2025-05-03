@@ -4,7 +4,7 @@ import time
 
 from saic_ismart_client_ng.api.schema import GpsPosition, GpsStatus
 from saic_ismart_client_ng.api.vehicle import VehicleStatusResp
-from saic_ismart_client_ng.api.vehicle.schema import BasicVehicleStatus
+from saic_ismart_client_ng.api.vehicle.schema import BasicVehicleStatus, VinInfo
 from saic_ismart_client_ng.api.vehicle_charging import ChrgMgmtDataResp
 from saic_ismart_client_ng.api.vehicle_charging.schema import (
     ChrgMgmtData,
@@ -74,6 +74,12 @@ LIGHTS_DIPPED_BEAM = False
 LIGHTS_SIDE = False
 
 BMS_CHARGE_STATUS = "CHARGING_1"
+
+VEHICLE_BRAND_NAME = "A Brand"
+VEHICLE_COLOR_NAME = "A Color"
+VEHICLE_MODEL_NAME = "A Model"
+VEHICLE_NAME = "A Vehicle Name"
+VEHICLE_SERIES = "A Vehicle Series"
 
 
 def get_mock_vehicle_status_resp() -> VehicleStatusResp:
@@ -159,4 +165,17 @@ def get_mock_charge_management_data_resp() -> ChrgMgmtDataResp:
             totalBatteryCapacity=int(RAW_TOTAL_BATTERY_CAPACITY * 10.0),
             fuelRangeElec=int(DRIVETRAIN_RANGE_BMS * 10.0),
         ),
+    )
+
+
+def get_mock_vin_info() -> VinInfo:
+    return VinInfo(
+        brandName=VEHICLE_BRAND_NAME,
+        colorName=VEHICLE_COLOR_NAME,
+        isCurrentVehicle=True,
+        isSubaccount=False,
+        modelName=VEHICLE_MODEL_NAME,
+        name=VEHICLE_NAME,
+        series=VEHICLE_SERIES,
+        vin=VIN,
     )
