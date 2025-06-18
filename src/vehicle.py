@@ -15,6 +15,7 @@ from saic_ismart_client_ng.api.vehicle_charging import (
     TargetBatteryCode,
 )
 
+from extractors import extract_electric_range, extract_soc
 import mqtt_topics
 from status_publisher.charge.chrg_mgmt_data_resp import (
     ChrgMgmtDataRespProcessingResult,
@@ -25,7 +26,7 @@ from status_publisher.vehicle.vehicle_status_resp import (
     VehicleStatusRespProcessingResult,
     VehicleStatusRespPublisher,
 )
-from utils import datetime_to_str, value_in_range
+from utils import datetime_to_str
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -37,7 +38,6 @@ if TYPE_CHECKING:
         VehicleStatusResp,
     )
 
-    from integrations.openwb.charging_station import ChargingStation
     from publisher.core import Publisher
     from vehicle_info import VehicleInfo
 
@@ -70,7 +70,6 @@ class VehicleState:
         scheduler: BaseScheduler,
         account_prefix: str,
         vin_info: VehicleInfo,
-        charging_station: ChargingStation | None = None,
         charge_polling_min_percent: float = 1.0,
     ) -> None:
         self.publisher = publisher
@@ -83,7 +82,6 @@ class VehicleState:
         )
         self.vehicle: Final[VehicleInfo] = vin_info
         self.mqtt_vin_prefix = account_prefix
-        self.charging_station = charging_station
         self.last_car_activity: datetime.datetime = datetime.datetime.min
         self.last_successful_refresh: datetime.datetime = datetime.datetime.min
         self.__last_failed_refresh: datetime.datetime | None = None
@@ -278,36 +276,6 @@ class VehicleState:
                 processing_result.remote_heated_seats_front_right_level
             )
         return processing_result
-
-    def __publish_electric_range(self, raw_value: int | None) -> bool:
-        published, electric_range = self.__transform_and_publish(
-            topic=mqtt_topics.DRIVETRAIN_RANGE,
-            value=raw_value,
-            validator=lambda x: value_in_range(x, 1, 20460),
-            transform=lambda x: x / 10.0,
-        )
-        if self.charging_station is not None and self.charging_station.range_topic:
-            self.__publish(
-                topic=self.charging_station.range_topic,
-                value=electric_range,
-                no_prefix=True,
-            )
-        return published
-
-    def __publish_soc(self, soc: float | None) -> bool:
-        published, published_soc = self.__transform_and_publish(
-            topic=mqtt_topics.DRIVETRAIN_SOC,
-            value=soc,
-            validator=lambda v: value_in_range(v, 0, 100.0, is_max_excl=False),
-            transform=lambda x: 1.0 * x,
-        )
-        if self.charging_station is not None and self.charging_station.soc_topic:
-            self.__publish(
-                topic=self.charging_station.soc_topic,
-                value=published_soc,
-                no_prefix=True,
-            )
-        return published
 
     @property
     def hv_battery_active(self) -> bool:
@@ -546,31 +514,20 @@ class VehicleState:
         )
         self.hv_battery_active = hv_battery_active
 
-        # We can read this from either the BMS or the Vehicle Info
-        electric_range_published = False
-        soc_published = False
-
-        if charge_status is not None:
-            if (raw_fuel_range_elec := charge_status.raw_fuel_range_elec) is not None:
-                electric_range_published = self.__publish_electric_range(
-                    raw_fuel_range_elec
-                )
-
-            if (soc := charge_status.raw_soc) is not None:
-                soc_published = self.__publish_soc(soc / 10.0)
-
-        if not electric_range_published:
-            electric_range_published = self.__publish_electric_range(
-                vehicle_status.fuel_range_elec
+        # We can read those from either the BMS or the Vehicle Info
+        electric_range = extract_electric_range(vehicle_status, charge_status)
+        if electric_range is not None:
+            self.__publish(
+                topic=mqtt_topics.DRIVETRAIN_RANGE,
+                value=electric_range,
             )
-        if not soc_published:
-            soc_published = self.__publish_soc(vehicle_status.raw_soc)
 
-        if not electric_range_published:
-            LOG.warning("Could not extract a valid electric range")
-
-        if not soc_published:
-            LOG.warning("Could not extract a valid SoC")
+        soc = extract_soc(vehicle_status, charge_status)
+        if soc is not None:
+            self.__publish(
+                topic=mqtt_topics.DRIVETRAIN_SOC,
+                value=soc,
+            )
 
     def handle_scheduled_battery_heating_status(
         self, scheduled_battery_heating_status: ScheduledBatteryHeatingResp | None
@@ -707,22 +664,6 @@ class VehicleState:
         actual_topic = topic if no_prefix else self.get_topic(topic)
         published = self.__publish_directly(topic=actual_topic, value=value)
         return published, value
-
-    def __transform_and_publish(
-        self,
-        *,
-        topic: str,
-        value: T | None,
-        validator: Callable[[T], bool] = lambda _: True,
-        transform: Callable[[T], Publishable],
-        no_prefix: bool = False,
-    ) -> tuple[bool, Publishable | None]:
-        if value is None or not validator(value):
-            return False, None
-        actual_topic = topic if no_prefix else self.get_topic(topic)
-        transformed_value = transform(value)
-        published = self.__publish_directly(topic=actual_topic, value=transformed_value)
-        return published, transformed_value
 
     def __publish_directly(self, *, topic: str, value: Publishable) -> bool:
         published = False

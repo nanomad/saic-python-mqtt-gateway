@@ -150,25 +150,11 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
         account_prefix = (
             f"{self.configuration.saic_user}/{mqtt_topics.VEHICLES}/{vin_info.vin}"
         )
-        charging_station = self.get_charging_station(vin_info.vin)
-        if charging_station and charging_station.soc_topic:
-            LOG.debug(
-                "SoC of %s for charging station will be published over MQTT topic: %s",
-                vin_info.vin,
-                charging_station.soc_topic,
-            )
-        if charging_station and charging_station.range_topic:
-            LOG.debug(
-                "Range of %s for charging station will be published over MQTT topic: %s",
-                vin_info.vin,
-                charging_station.range_topic,
-            )
         vehicle_state = VehicleState(
             self.publisher,
             self.__scheduler,
             account_prefix,
             vin_info,
-            charging_station,
             charge_polling_min_percent=self.configuration.charge_dynamic_polling_min_percentage,
         )
         vehicle_handler = VehicleHandler(

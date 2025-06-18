@@ -55,9 +55,7 @@ class MqttPublisher(Publisher):
             ssl_context = ssl.create_default_context()
             cert_uri = self.configuration.tls_server_cert_path
             if cert_uri:
-                LOG.debug(
-                    f"Using custom CA file {cert_uri}"
-                )
+                LOG.debug(f"Using custom CA file {cert_uri}")
                 ssl_context.load_verify_locations(cafile=cert_uri)
                 ssl_context.check_hostname = False
         else:

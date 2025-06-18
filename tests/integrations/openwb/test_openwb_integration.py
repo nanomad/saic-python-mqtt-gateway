@@ -8,11 +8,8 @@ import pytest
 from saic_ismart_client_ng.api.vehicle.schema import VinInfo
 
 from configuration import Configuration
-import mqtt_topics
-from vehicle import VehicleState
-from vehicle_info import VehicleInfo
-
-from .common_mocks import (
+from integrations.openwb import ChargingStation, OpenWBIntegration
+from tests.common_mocks import (
     DRIVETRAIN_RANGE_BMS,
     DRIVETRAIN_RANGE_VEHICLE,
     DRIVETRAIN_SOC_BMS,
@@ -21,10 +18,17 @@ from .common_mocks import (
     get_mock_charge_management_data_resp,
     get_mock_vehicle_status_resp,
 )
-from .mocks import MessageCapturingConsolePublisher
+from tests.mocks import MessageCapturingConsolePublisher
+from vehicle import VehicleState
+from vehicle_info import VehicleInfo
+
+RANGE_TOPIC = "/mock/range"
+CHARGE_STATE_TOPIC = "/mock/charge/state"
+SOC_TOPIC = "/mock/soc/state"
+CHARGING_VALUE = "VehicleIsCharging"
 
 
-class TestVehicleState(unittest.IsolatedAsyncioTestCase):
+class TestOpenWBIntegration(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         config = Configuration()
         config.anonymized_publishing = False
@@ -37,6 +41,17 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
         self.vehicle_state = VehicleState(
             self.publisher, scheduler, account_prefix, vehicle_info
         )
+        charging_station = ChargingStation(
+            vin=VIN,
+            charge_state_topic=CHARGE_STATE_TOPIC,
+            charging_value=CHARGING_VALUE,
+            soc_topic=SOC_TOPIC,
+        )
+        charging_station.range_topic = RANGE_TOPIC
+        self.openwb_integration = OpenWBIntegration(
+            charging_station=charging_station,
+            publisher=self.publisher,
+        )
 
     async def test_update_soc_with_no_bms_data(self) -> None:
         vehicle_status_resp = get_mock_vehicle_status_resp()
@@ -45,25 +60,18 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
         # Reset topics since we are only asserting the differences
         self.publisher.map.clear()
 
-        self.vehicle_state.update_data_conflicting_in_vehicle_and_bms(
-            vehicle_status=result, charge_status=None
-        )
+        self.openwb_integration.update_openwb(vehicle_status=result, charge_status=None)
         self.assert_mqtt_topic(
-            TestVehicleState.get_topic(mqtt_topics.DRIVETRAIN_SOC),
+            SOC_TOPIC,
             float(DRIVETRAIN_SOC_VEHICLE),
         )
         self.assert_mqtt_topic(
-            TestVehicleState.get_topic(mqtt_topics.DRIVETRAIN_RANGE),
+            RANGE_TOPIC,
             DRIVETRAIN_RANGE_VEHICLE,
         )
-        self.assert_mqtt_topic(
-            TestVehicleState.get_topic(mqtt_topics.DRIVETRAIN_HV_BATTERY_ACTIVE), True
-        )
         expected_topics = {
-            "/vehicles/vin10000000000000/drivetrain/hvBatteryActive",
-            "/vehicles/vin10000000000000/refresh/lastActivity",
-            "/vehicles/vin10000000000000/drivetrain/soc",
-            "/vehicles/vin10000000000000/drivetrain/range",
+            SOC_TOPIC,
+            RANGE_TOPIC,
         }
         assert expected_topics == set(self.publisher.map.keys())
 
@@ -80,25 +88,19 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
         # Reset topics since we are only asserting the differences
         self.publisher.map.clear()
 
-        self.vehicle_state.update_data_conflicting_in_vehicle_and_bms(
+        self.openwb_integration.update_openwb(
             vehicle_status=vehicle_status_resp_result,
             charge_status=chrg_mgmt_data_resp_result,
         )
+
+        self.assert_mqtt_topic(SOC_TOPIC, DRIVETRAIN_SOC_BMS)
         self.assert_mqtt_topic(
-            TestVehicleState.get_topic(mqtt_topics.DRIVETRAIN_SOC), DRIVETRAIN_SOC_BMS
-        )
-        self.assert_mqtt_topic(
-            TestVehicleState.get_topic(mqtt_topics.DRIVETRAIN_RANGE),
+            RANGE_TOPIC,
             DRIVETRAIN_RANGE_BMS,
         )
-        self.assert_mqtt_topic(
-            TestVehicleState.get_topic(mqtt_topics.DRIVETRAIN_HV_BATTERY_ACTIVE), True
-        )
         expected_topics = {
-            "/vehicles/vin10000000000000/drivetrain/hvBatteryActive",
-            "/vehicles/vin10000000000000/refresh/lastActivity",
-            "/vehicles/vin10000000000000/drivetrain/soc",
-            "/vehicles/vin10000000000000/drivetrain/range",
+            SOC_TOPIC,
+            RANGE_TOPIC,
         }
         assert expected_topics == set(self.publisher.map.keys())
 
@@ -111,7 +113,3 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
                 assert value == mqtt_map[topic]
         else:
             self.fail(f"MQTT map does not contain topic {topic}")
-
-    @staticmethod
-    def get_topic(sub_topic: str) -> str:
-        return f"/vehicles/{VIN}/{sub_topic}"

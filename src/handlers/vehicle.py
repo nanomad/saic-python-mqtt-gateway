@@ -12,6 +12,7 @@ from handlers.vehicle_command import VehicleCommandHandler
 from integrations import IntegrationException
 from integrations.abrp.api import AbrpApi
 from integrations.home_assistant.discovery import HomeAssistantDiscovery
+from integrations.openwb import OpenWBIntegration
 from integrations.osmand.api import OsmAndApi
 import mqtt_topics
 from saic_api_listener import MqttGatewayAbrpListener, MqttGatewayOsmAndListener
@@ -61,8 +62,9 @@ class VehicleHandler:
         self.vehicle_state = vehicle_state
         self.__ha_discovery = self.__setup_ha_discovery(vehicle_state, vin_info, config)
 
-        self.__setup_abrp(config, vin_info)
-        self.__setup_osmand(config, vin_info)
+        self.openwb_integration = self.__setup_openwb(config, vin_info, publisher)
+        self.abrp_api = self.__setup_abrp(config, vin_info)
+        self.osmand_api = self.__setup_osmand(config, vin_info)
         self.__vehicle_info_publisher = VehicleInfoPublisher(
             self.vin_info, self.publisher, self.vehicle_prefix
         )
@@ -74,7 +76,18 @@ class VehicleHandler:
             vehicle_prefix=self.vehicle_prefix,
         )
 
-    def __setup_abrp(self, config: Configuration, vin_info: VehicleInfo) -> None:
+    def __setup_openwb(
+        self, config: Configuration, vin_info: VehicleInfo, publisher: Publisher
+    ) -> OpenWBIntegration | None:
+        charging_station = config.charging_stations_by_vin.get(vin_info.vin, None)
+        if not charging_station:
+            return None
+        return OpenWBIntegration(
+            charging_station=charging_station,
+            publisher=publisher,
+        )
+
+    def __setup_abrp(self, config: Configuration, vin_info: VehicleInfo) -> AbrpApi:
         if vin_info.vin in self.configuration.abrp_token_map:
             abrp_user_token = self.configuration.abrp_token_map[vin_info.vin]
         else:
@@ -83,14 +96,15 @@ class VehicleHandler:
             abrp_api_listener = MqttGatewayAbrpListener(self.publisher)
         else:
             abrp_api_listener = None
-        self.abrp_api = AbrpApi(
+        return AbrpApi(
             self.configuration.abrp_api_key, abrp_user_token, listener=abrp_api_listener
         )
 
-    def __setup_osmand(self, config: Configuration, vin_info: VehicleInfo) -> None:
+    def __setup_osmand(
+        self, config: Configuration, vin_info: VehicleInfo
+    ) -> OsmAndApi | None:
         if not self.configuration.osmand_server_uri:
-            self.osmand_api = None
-            return
+            return None
 
         if config.publish_raw_osmand_data:
             api_listener = MqttGatewayOsmAndListener(self.publisher)
@@ -99,7 +113,7 @@ class VehicleHandler:
         osmand_device_id = self.configuration.osmand_device_id_map.get(
             vin_info.vin, vin_info.vin
         )
-        self.osmand_api = OsmAndApi(
+        return OsmAndApi(
             server_uri=self.configuration.osmand_server_uri,
             device_id=osmand_device_id,
             listener=api_listener,
@@ -171,7 +185,6 @@ class VehicleHandler:
                 )
         else:
             LOG.debug("Skipping EV-related updates as the vehicle is not an EV")
-            charge_status = None
 
         self.vehicle_state.update_data_conflicting_in_vehicle_and_bms(
             vehicle_status_processing_result, charge_status_processing_result
@@ -180,6 +193,9 @@ class VehicleHandler:
         self.vehicle_state.mark_successful_refresh()
         LOG.info("Refreshing vehicle status succeeded...")
 
+        self.__refresh_openwb(
+            vehicle_status_processing_result, charge_status_processing_result
+        )
         await self.__refresh_abrp(charge_status, vehicle_status)
         await self.__refresh_osmand(charge_status, vehicle_status)
 
@@ -196,10 +212,21 @@ class VehicleHandler:
             and datetime.datetime.now() > start_time + datetime.timedelta(seconds=10)
         )
 
+    def __refresh_openwb(
+        self,
+        vehicle_status_processing_result: VehicleStatusRespProcessingResult,
+        charge_status_processing_result: ChrgMgmtDataRespProcessingResult | None,
+    ) -> None:
+        if self.openwb_integration is None:
+            return
+        self.openwb_integration.update_openwb(
+            vehicle_status_processing_result, charge_status_processing_result
+        )
+
     async def __refresh_osmand(
         self,
         charge_status: ChrgMgmtDataResp | None,
-        vehicle_status: VehicleStatusResp | None,
+        vehicle_status: VehicleStatusResp,
     ) -> None:
         if not self.osmand_api:
             return
@@ -215,9 +242,7 @@ class VehicleHandler:
             LOG.info(f"OsmAnd not refreshed, reason {response}")
 
     async def __refresh_abrp(
-        self,
-        charge_status: ChrgMgmtDataResp | None,
-        vehicle_status: VehicleStatusResp | None,
+        self, charge_status: ChrgMgmtDataResp | None, vehicle_status: VehicleStatusResp
     ) -> None:
         abrp_refreshed, abrp_response = await self.abrp_api.update_abrp(
             vehicle_status, charge_status
