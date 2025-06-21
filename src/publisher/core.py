@@ -46,6 +46,10 @@ class Publisher(ABC):
         pass
 
     @abstractmethod
+    def enable_commands(self) -> None:
+        pass
+
+    @abstractmethod
     def is_connected(self) -> bool:
         raise NotImplementedError
 

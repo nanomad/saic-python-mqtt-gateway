@@ -88,9 +88,11 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
 
         for vin_info in vin_list.vinList:
             await self.setup_vehicle(alarm_switches, vin_info)
+
         message_handler = MessageHandler(
             gateway=self, relogin_handler=self.__relogin_handler, saicapi=self.saic_api
         )
+
         self.__scheduler.add_job(
             func=message_handler.check_for_new_messages,
             trigger="interval",
@@ -99,6 +101,10 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
             name="Check for new messages",
             max_instances=1,
         )
+
+        # We defer this later in the process so that we can properly configure the gateway and each car via MQTT
+        LOG.info("Enabling MQTT command handling")
+        self.publisher.enable_commands()
 
         LOG.info("Starting scheduler")
         self.__scheduler.start()

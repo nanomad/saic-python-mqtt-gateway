@@ -17,6 +17,10 @@ class ConsolePublisher(Publisher):
     @override
     def is_connected(self) -> bool:
         return True
+ 
+    @override
+    def enable_commands(self) -> None:
+        pass
 
     @override
     def publish_json(

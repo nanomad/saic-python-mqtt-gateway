@@ -126,6 +126,9 @@ class VehicleHandler:
 
         while True:
             if self.__should_complete_configuration(start_time):
+                LOG.info(
+                    "Waiting to complete configuration vehicle %s", self.vin_info.vin
+                )
                 self.vehicle_state.configure_missing()
 
             if self.__should_poll():
