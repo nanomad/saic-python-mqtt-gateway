@@ -75,6 +75,10 @@ class Publisher(ABC):
     def publish_float(self, key: str, value: float, no_prefix: bool = False) -> None:
         raise NotImplementedError
 
+    @abstractmethod
+    def clear_topic(self, key: str, no_prefix: bool = False) -> None:
+        raise NotImplementedError
+
     def get_mqtt_account_prefix(self) -> str:
         return self.__remove_special_mqtt_characters(
             f"{self.__topic_root}/{self.configuration.saic_user}"

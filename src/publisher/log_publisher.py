@@ -17,7 +17,7 @@ class ConsolePublisher(Publisher):
     @override
     def is_connected(self) -> bool:
         return True
- 
+
     @override
     def enable_commands(self) -> None:
         pass
@@ -44,6 +44,10 @@ class ConsolePublisher(Publisher):
     @override
     def publish_float(self, key: str, value: float, no_prefix: bool = False) -> None:
         self.internal_publish(key, value)
+
+    @override
+    def clear_topic(self, key: str, no_prefix: bool = False) -> None:
+        self.internal_publish(key, None)
 
     def internal_publish(self, key: str, value: Any) -> None:
         LOG.debug(f"{key}: {value}")

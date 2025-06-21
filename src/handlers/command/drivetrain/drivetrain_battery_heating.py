@@ -5,7 +5,11 @@ from typing import override
 
 from saic_ismart_client_ng.api.vehicle_charging import ChrgPtcHeatResp
 
-from handlers.command.base import BooleanCommandHandler
+from handlers.command.base import (
+    RESULT_REFRESH_AND_CLEAR,
+    BooleanCommandHandler,
+    CommandProcessingResult,
+)
 import mqtt_topics
 
 LOG = logging.getLogger(__name__)
@@ -28,7 +32,9 @@ class DrivetrainBatteryHeatingCommand(BooleanCommandHandler[ChrgPtcHeatResp]):
         return await self.saic_api.control_battery_heating(self.vin, enable=False)
 
     @override
-    async def should_refresh(self, response: ChrgPtcHeatResp | None) -> bool:
+    async def _get_action_result(
+        self, response: ChrgPtcHeatResp | None
+    ) -> CommandProcessingResult:
         if response is not None and response.ptcHeatResp is not None:
             decoded = response.heating_stop_reason
             self.publisher.publish_str(
@@ -39,4 +45,4 @@ class DrivetrainBatteryHeatingCommand(BooleanCommandHandler[ChrgPtcHeatResp]):
                 if decoded is None
                 else decoded.name,
             )
-        return True
+        return RESULT_REFRESH_AND_CLEAR

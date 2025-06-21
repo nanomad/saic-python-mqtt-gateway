@@ -646,7 +646,7 @@ class VehicleState:
 
     def get_ac_temperature_idx(self) -> int:
         return self.vehicle.get_ac_temperature_idx(self.get_remote_ac_temperature())
- 
+
     def update_battery_capacity(self, new_capacity: float) -> None:
         self.vehicle.custom_battery_capacity = new_capacity
 

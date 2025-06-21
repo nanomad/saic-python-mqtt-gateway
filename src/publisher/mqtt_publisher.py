@@ -204,6 +204,10 @@ class MqttPublisher(Publisher):
     def publish_float(self, key: str, value: float, no_prefix: bool = False) -> None:
         self.__publish(topic=self.get_topic(key, no_prefix), payload=value)
 
+    @override
+    def clear_topic(self, key: str, no_prefix: bool = False) -> None:
+        self.__publish(topic=self.get_topic(key, no_prefix), payload=None)
+
     def get_vin_from_topic(self, topic: str) -> str:
         global_topic_removed = topic[len(self.configuration.mqtt_topic) + 1 :]
         elements = global_topic_removed.split("/")

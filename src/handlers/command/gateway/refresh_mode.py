@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import override
 
-from handlers.command.base import PayloadConvertingCommandHandler
+from handlers.command.base import (
+    RESULT_DO_NOTHING,
+    CommandProcessingResult,
+    PayloadConvertingCommandHandler,
+)
 import mqtt_topics
 from vehicle import RefreshMode
 
@@ -20,8 +24,10 @@ class RefreshModeCommand(PayloadConvertingCommandHandler[RefreshMode]):
         return RefreshMode.get(normalized_payload)
 
     @override
-    async def handle_typed_payload(self, refresh_mode: RefreshMode) -> bool:
+    async def handle_typed_payload(
+        self, refresh_mode: RefreshMode
+    ) -> CommandProcessingResult:
         self.vehicle_state.set_refresh_mode(
             refresh_mode, "MQTT direct set refresh mode command execution"
         )
-        return False
+        return RESULT_DO_NOTHING

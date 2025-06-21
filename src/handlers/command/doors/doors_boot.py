@@ -3,7 +3,11 @@ from __future__ import annotations
 import logging
 from typing import override
 
-from handlers.command.base import BooleanCommandHandler
+from handlers.command.base import (
+    RESULT_REFRESH_AND_CLEAR,
+    BooleanCommandHandler,
+    CommandProcessingResult,
+)
 import mqtt_topics
 
 LOG = logging.getLogger(__name__)
@@ -23,3 +27,7 @@ class DoorsBootCommand(BooleanCommandHandler[None]):
     async def handle_false(self) -> None:
         LOG.info(f"Vehicle {self.vin} boot will be unlocked")
         await self.saic_api.open_tailgate(self.vin)
+
+    @override
+    async def _get_action_result(self, _action_result: None) -> CommandProcessingResult:
+        return RESULT_REFRESH_AND_CLEAR

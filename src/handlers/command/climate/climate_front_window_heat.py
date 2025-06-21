@@ -3,7 +3,11 @@ from __future__ import annotations
 import logging
 from typing import override
 
-from handlers.command.base import BooleanCommandHandler
+from handlers.command.base import (
+    RESULT_REFRESH_AND_CLEAR,
+    BooleanCommandHandler,
+    CommandProcessingResult,
+)
 import mqtt_topics
 
 LOG = logging.getLogger(__name__)
@@ -24,3 +28,7 @@ class ClimateFrontWindowHeatCommand(BooleanCommandHandler[None]):
     async def handle_false(self) -> None:
         LOG.info("Front window heating will be switched off")
         await self.saic_api.stop_ac(self.vin)
+
+    @override
+    async def _get_action_result(self, _action_result: None) -> CommandProcessingResult:
+        return RESULT_REFRESH_AND_CLEAR

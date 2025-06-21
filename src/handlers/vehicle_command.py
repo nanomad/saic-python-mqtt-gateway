@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import logging
 from typing import TYPE_CHECKING, Final
 
@@ -22,6 +23,14 @@ if TYPE_CHECKING:
     CommandHandler = Callable[[str], Awaitable[bool]]
 
 LOG = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, kw_only=True)
+class _MqttCommandTopic:
+    command: str
+    command_no_global: str
+    command_no_vin: str
+    response_no_global: str
 
 
 class VehicleCommandHandler:
@@ -49,15 +58,15 @@ class VehicleCommandHandler:
         return self.vehicle_state.publisher
 
     async def handle_mqtt_command(self, *, topic: str, payload: str) -> None:
-        topic, result_topic = self.__get_command_topics(topic)
-        handler = self.__command_handlers.get(topic)
+        analyzed_topic = self.__get_command_topics(topic)
+        handler = self.__command_handlers.get(analyzed_topic.command_no_vin)
         if not handler:
-            msg = f"No handler found for command topic {topic}"
-            self.publisher.publish_str(result_topic, msg)
+            msg = f"No handler found for command topic {analyzed_topic.command_no_vin}"
+            self.publisher.publish_str(analyzed_topic.response_no_global, msg)
             LOG.error(msg)
         else:
             await self.__execute_mqtt_command_handler(
-                handler=handler, payload=payload, topic=topic, result_topic=result_topic
+                handler=handler, payload=payload, analyzed_topic=analyzed_topic
             )
 
     async def __execute_mqtt_command_handler(
@@ -65,16 +74,21 @@ class VehicleCommandHandler:
         *,
         handler: CommandHandlerBase,
         payload: str,
-        topic: str,
-        result_topic: str,
+        analyzed_topic: _MqttCommandTopic,
     ) -> None:
+        topic = analyzed_topic.command_no_vin
+        topic_no_global = analyzed_topic.command_no_global
+        result_topic = analyzed_topic.response_no_global
+
         try:
-            should_force_refresh = await handler.handle(payload)
+            execution_result = await handler.handle(payload)
             self.publisher.publish_str(result_topic, "Success")
-            if should_force_refresh:
+            if execution_result.force_refresh:
                 self.vehicle_state.set_refresh_mode(
                     RefreshMode.FORCE, f"after command execution on topic {topic}"
                 )
+            if execution_result.clear_command:
+                self.publisher.clear_topic(topic_no_global)
         except MqttGatewayException as e:
             self.publisher.publish_str(result_topic, f"Failed: {e.message}")
             LOG.exception(e.message, exc_info=e)
@@ -91,7 +105,7 @@ class VehicleCommandHandler:
                 "handle_mqtt_command failed with an unexpected exception", exc_info=se
             )
 
-    def __get_command_topics(self, topic: str) -> tuple[str, str]:
+    def __get_command_topics(self, topic: str) -> _MqttCommandTopic:
         global_topic_removed = topic.removeprefix(self.global_mqtt_topic).removeprefix(
             "/"
         )
@@ -103,4 +117,9 @@ class VehicleCommandHandler:
             + "/"
             + mqtt_topics.RESULT_SUFFIX
         )
-        return set_topic, result_topic
+        return _MqttCommandTopic(
+            command=topic,
+            command_no_global=global_topic_removed,
+            command_no_vin=set_topic,
+            response_no_global=result_topic,
+        )
