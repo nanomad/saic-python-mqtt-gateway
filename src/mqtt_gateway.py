@@ -75,6 +75,9 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
         return ConsolePublisher(self.configuration)
 
     async def run(self) -> None:
+        LOG.info("Connecting to MQTT Broker")
+        await self.publisher.connect()
+
         message_request_interval = self.configuration.messages_request_interval
         await self.__do_initial_login(message_request_interval)
 
@@ -96,8 +99,6 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
             name="Check for new messages",
             max_instances=1,
         )
-        LOG.info("Connecting to MQTT Broker")
-        await self.publisher.connect()
 
         LOG.info("Starting scheduler")
         self.__scheduler.start()
