@@ -119,3 +119,9 @@ class IntCommandHandler(PayloadConvertingCommandHandler[int], metaclass=ABCMeta)
     @staticmethod
     def convert_payload(payload: str) -> int:
         return int(payload.strip().lower())
+
+
+class FloatCommandHandler(PayloadConvertingCommandHandler[float], metaclass=ABCMeta):
+    @staticmethod
+    def convert_payload(payload: str) -> float:
+        return float(payload.strip().lower())
