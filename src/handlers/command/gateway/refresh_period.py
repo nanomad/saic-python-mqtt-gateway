@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import override
 
-from handlers.command.base import IntCommandHandler
+from handlers.command.base import (
+    RESULT_DO_NOTHING,
+    CommandProcessingResult,
+    IntCommandHandler,
+)
 import mqtt_topics
 
 
@@ -13,9 +17,9 @@ class RefreshPeriodActiveCommand(IntCommandHandler):
         return mqtt_topics.REFRESH_PERIOD_ACTIVE_SET
 
     @override
-    async def handle_typed_payload(self, payload: int) -> bool:
+    async def handle_typed_payload(self, payload: int) -> CommandProcessingResult:
         self.vehicle_state.set_refresh_period_active(payload)
-        return False
+        return RESULT_DO_NOTHING
 
 
 class RefreshPeriodInactiveCommand(IntCommandHandler):
@@ -25,9 +29,9 @@ class RefreshPeriodInactiveCommand(IntCommandHandler):
         return mqtt_topics.REFRESH_PERIOD_INACTIVE_SET
 
     @override
-    async def handle_typed_payload(self, payload: int) -> bool:
+    async def handle_typed_payload(self, payload: int) -> CommandProcessingResult:
         self.vehicle_state.set_refresh_period_inactive(payload)
-        return False
+        return RESULT_DO_NOTHING
 
 
 class RefreshPeriodInactiveGraceCommand(IntCommandHandler):
@@ -37,9 +41,9 @@ class RefreshPeriodInactiveGraceCommand(IntCommandHandler):
         return mqtt_topics.REFRESH_PERIOD_INACTIVE_GRACE_SET
 
     @override
-    async def handle_typed_payload(self, payload: int) -> bool:
+    async def handle_typed_payload(self, payload: int) -> CommandProcessingResult:
         self.vehicle_state.set_refresh_period_inactive_grace(payload)
-        return False
+        return RESULT_DO_NOTHING
 
 
 class RefreshPeriodAfterShutdownCommand(IntCommandHandler):
@@ -49,6 +53,6 @@ class RefreshPeriodAfterShutdownCommand(IntCommandHandler):
         return mqtt_topics.REFRESH_PERIOD_AFTER_SHUTDOWN_SET
 
     @override
-    async def handle_typed_payload(self, payload: int) -> bool:
+    async def handle_typed_payload(self, payload: int) -> CommandProcessingResult:
         self.vehicle_state.set_refresh_period_after_shutdown(payload)
-        return False
+        return RESULT_DO_NOTHING

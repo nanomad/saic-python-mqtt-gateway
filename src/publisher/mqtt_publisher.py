@@ -26,6 +26,7 @@ class MqttPublisher(Publisher):
         self.vin_by_charge_state_topic: dict[str, str] = {}
         self.last_charge_state_by_vin: dict[str, str] = {}
         self.vin_by_charger_connected_topic: dict[str, str] = {}
+        self.first_connection = True
 
         mqtt_client = gmqtt.Client(
             client_id=str(self.publisher_id),
@@ -72,40 +73,9 @@ class MqttPublisher(Publisher):
     ) -> None:
         if rc == gmqtt.constants.CONNACK_ACCEPTED:
             LOG.info("Connected to MQTT broker")
-            mqtt_account_prefix = self.get_mqtt_account_prefix()
-            self.client.subscribe(
-                f"{mqtt_account_prefix}/{mqtt_topics.VEHICLES}/+/+/+/{mqtt_topics.SET_SUFFIX}"
-            )
-            self.client.subscribe(
-                f"{mqtt_account_prefix}/{mqtt_topics.VEHICLES}/+/+/+/+/{mqtt_topics.SET_SUFFIX}"
-            )
-            self.client.subscribe(
-                f"{mqtt_account_prefix}/{mqtt_topics.VEHICLES}/+/{mqtt_topics.REFRESH_MODE}/{mqtt_topics.SET_SUFFIX}"
-            )
-            self.client.subscribe(
-                f"{mqtt_account_prefix}/{mqtt_topics.VEHICLES}/+/{mqtt_topics.REFRESH_PERIOD}/+/{mqtt_topics.SET_SUFFIX}"
-            )
-            for (
-                charging_station
-            ) in self.configuration.charging_stations_by_vin.values():
-                LOG.debug(
-                    f"Subscribing to MQTT topic {charging_station.charge_state_topic}"
-                )
-                self.vin_by_charge_state_topic[charging_station.charge_state_topic] = (
-                    charging_station.vin
-                )
-                self.client.subscribe(charging_station.charge_state_topic)
-                if charging_station.connected_topic:
-                    LOG.debug(
-                        f"Subscribing to MQTT topic {charging_station.connected_topic}"
-                    )
-                    self.vin_by_charger_connected_topic[
-                        charging_station.connected_topic
-                    ] = charging_station.vin
-                    self.client.subscribe(charging_station.connected_topic)
-            if self.configuration.ha_discovery_enabled:
-                # enable dynamic discovery pushing in case ha reconnects
-                self.client.subscribe(self.configuration.ha_lwt_topic)
+            if not self.first_connection:
+                self.enable_commands()
+            self.first_connection = False
             self.keepalive()
         else:
             if rc == gmqtt.constants.CONNACK_REFUSED_BAD_USERNAME_PASSWORD:
@@ -120,6 +90,42 @@ class MqttPublisher(Publisher):
                 LOG.error(f"MQTT connection error.Return code {rc}")
             msg = f"Unable to connect to MQTT broker. Return code: {rc}"
             raise SystemExit(msg)
+
+    @override
+    def enable_commands(self) -> None:
+        LOG.info("Subscribing to MQTT command topics")
+        mqtt_account_prefix = self.get_mqtt_account_prefix()
+        self.client.subscribe(
+            f"{mqtt_account_prefix}/{mqtt_topics.VEHICLES}/+/+/+/{mqtt_topics.SET_SUFFIX}"
+        )
+        self.client.subscribe(
+            f"{mqtt_account_prefix}/{mqtt_topics.VEHICLES}/+/+/+/+/{mqtt_topics.SET_SUFFIX}"
+        )
+        self.client.subscribe(
+            f"{mqtt_account_prefix}/{mqtt_topics.VEHICLES}/+/{mqtt_topics.REFRESH_MODE}/{mqtt_topics.SET_SUFFIX}"
+        )
+        self.client.subscribe(
+            f"{mqtt_account_prefix}/{mqtt_topics.VEHICLES}/+/{mqtt_topics.REFRESH_PERIOD}/+/{mqtt_topics.SET_SUFFIX}"
+        )
+        for charging_station in self.configuration.charging_stations_by_vin.values():
+            LOG.debug(
+                f"Subscribing to MQTT topic {charging_station.charge_state_topic}"
+            )
+            self.vin_by_charge_state_topic[charging_station.charge_state_topic] = (
+                charging_station.vin
+            )
+            self.client.subscribe(charging_station.charge_state_topic)
+            if charging_station.connected_topic:
+                LOG.debug(
+                    f"Subscribing to MQTT topic {charging_station.connected_topic}"
+                )
+                self.vin_by_charger_connected_topic[
+                    charging_station.connected_topic
+                ] = charging_station.vin
+                self.client.subscribe(charging_station.connected_topic)
+        if self.configuration.ha_discovery_enabled:
+            # enable dynamic discovery pushing in case ha reconnects
+            self.client.subscribe(self.configuration.ha_lwt_topic)
 
     async def __on_message(
         self, _client: Any, topic: str, payload: Any, _qos: Any, _properties: Any
@@ -197,6 +203,10 @@ class MqttPublisher(Publisher):
     @override
     def publish_float(self, key: str, value: float, no_prefix: bool = False) -> None:
         self.__publish(topic=self.get_topic(key, no_prefix), payload=value)
+
+    @override
+    def clear_topic(self, key: str, no_prefix: bool = False) -> None:
+        self.__publish(topic=self.get_topic(key, no_prefix), payload=None)
 
     def get_vin_from_topic(self, topic: str) -> str:
         global_topic_removed = topic[len(self.configuration.mqtt_topic) + 1 :]

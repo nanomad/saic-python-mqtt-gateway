@@ -46,6 +46,10 @@ class Publisher(ABC):
         pass
 
     @abstractmethod
+    def enable_commands(self) -> None:
+        pass
+
+    @abstractmethod
     def is_connected(self) -> bool:
         raise NotImplementedError
 
@@ -69,6 +73,10 @@ class Publisher(ABC):
 
     @abstractmethod
     def publish_float(self, key: str, value: float, no_prefix: bool = False) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def clear_topic(self, key: str, no_prefix: bool = False) -> None:
         raise NotImplementedError
 
     def get_mqtt_account_prefix(self) -> str:

@@ -33,6 +33,14 @@ class VehicleInfo:
         )
         self.__custom_battery_capacity: float | None = custom_battery_capacity
 
+    @property
+    def custom_battery_capacity(self) -> float | None:
+        return self.__custom_battery_capacity
+
+    @custom_battery_capacity.setter
+    def custom_battery_capacity(self, value: float) -> None:
+        self.__custom_battery_capacity = value
+
     @staticmethod
     def __properties_from_configuration(
         configuration: list[VehicleModelConfiguration],

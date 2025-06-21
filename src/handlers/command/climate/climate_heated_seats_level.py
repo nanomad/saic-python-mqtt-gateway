@@ -4,7 +4,11 @@ import logging
 from typing import override
 
 from exceptions import MqttGatewayException
-from handlers.command.base import IntCommandHandler
+from handlers.command.base import (
+    RESULT_REFRESH_AND_CLEAR,
+    CommandProcessingResult,
+    IntCommandHandler,
+)
 import mqtt_topics
 
 LOG = logging.getLogger(__name__)
@@ -17,7 +21,7 @@ class ClimateHeatedSeatsFrontLeftLevelCommand(IntCommandHandler):
         return mqtt_topics.CLIMATE_HEATED_SEATS_FRONT_LEFT_LEVEL_SET
 
     @override
-    async def handle_typed_payload(self, level: int) -> bool:
+    async def handle_typed_payload(self, level: int) -> CommandProcessingResult:
         try:
             LOG.info("Setting heated seats front left level to %d", level)
             changed = self.vehicle_state.update_heated_seats_front_left_level(level)
@@ -32,7 +36,7 @@ class ClimateHeatedSeatsFrontLeftLevelCommand(IntCommandHandler):
         except Exception as e:
             msg = f"Error setting heated seats: {e}"
             raise MqttGatewayException(msg) from e
-        return True
+        return RESULT_REFRESH_AND_CLEAR
 
 
 class ClimateHeatedSeatsFrontRightLevelCommand(IntCommandHandler):
@@ -42,7 +46,7 @@ class ClimateHeatedSeatsFrontRightLevelCommand(IntCommandHandler):
         return mqtt_topics.CLIMATE_HEATED_SEATS_FRONT_RIGHT_LEVEL_SET
 
     @override
-    async def handle_typed_payload(self, level: int) -> bool:
+    async def handle_typed_payload(self, level: int) -> CommandProcessingResult:
         try:
             LOG.info("Setting heated seats front right level to %d", level)
             changed = self.vehicle_state.update_heated_seats_front_right_level(level)
@@ -57,4 +61,4 @@ class ClimateHeatedSeatsFrontRightLevelCommand(IntCommandHandler):
         except Exception as e:
             msg = f"Error setting heated seats: {e}"
             raise MqttGatewayException(msg) from e
-        return True
+        return RESULT_REFRESH_AND_CLEAR

@@ -5,7 +5,11 @@ from typing import override
 
 from saic_ismart_client_ng.api.vehicle_charging import TargetBatteryCode
 
-from handlers.command.base import PayloadConvertingCommandHandler
+from handlers.command.base import (
+    RESULT_REFRESH_ONLY,
+    CommandProcessingResult,
+    PayloadConvertingCommandHandler,
+)
 import mqtt_topics
 
 LOG = logging.getLogger(__name__)
@@ -26,10 +30,10 @@ class DrivetrainSoCTargetCommand(PayloadConvertingCommandHandler[TargetBatteryCo
     @override
     async def handle_typed_payload(
         self, target_battery_code: TargetBatteryCode
-    ) -> bool:
+    ) -> CommandProcessingResult:
         LOG.info("Setting SoC target to %s", str(target_battery_code))
         await self.saic_api.set_target_battery_soc(
             self.vin, target_soc=target_battery_code
         )
         self.vehicle_state.update_target_soc(target_battery_code)
-        return True
+        return RESULT_REFRESH_ONLY

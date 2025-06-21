@@ -6,7 +6,11 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any, override
 
-from handlers.command.base import PayloadConvertingCommandHandler
+from handlers.command.base import (
+    RESULT_REFRESH_ONLY,
+    CommandProcessingResult,
+    PayloadConvertingCommandHandler,
+)
 import mqtt_topics
 
 if TYPE_CHECKING:
@@ -47,7 +51,7 @@ class DrivetrainBatteryHeatingScheduleCommand(
     @override
     async def handle_typed_payload(
         self, payload: BatteryHeatingScheduleCommandPayload
-    ) -> bool:
+    ) -> CommandProcessingResult:
         start_time = payload.start_time
         should_enable = payload.enable
         changed = self.vehicle_state.update_scheduled_battery_heating(
@@ -64,4 +68,4 @@ class DrivetrainBatteryHeatingScheduleCommand(
                 await self.saic_api.disable_schedule_battery_heating(self.vin)
         else:
             LOG.info("Battery heating schedule not changed")
-        return True
+        return RESULT_REFRESH_ONLY

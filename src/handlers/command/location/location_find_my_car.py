@@ -3,7 +3,11 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, override
 
-from handlers.command.base import MultiValuedCommandHandler
+from handlers.command.base import (
+    RESULT_REFRESH_AND_CLEAR,
+    CommandProcessingResult,
+    MultiValuedCommandHandler,
+)
 import mqtt_topics
 
 if TYPE_CHECKING:
@@ -26,6 +30,10 @@ class LocationFindMyCarCommand(MultiValuedCommandHandler[None]):
             "horn_only": self.__handle_horn_only,
             "stop": self.__handle_stop,
         }
+
+    @override
+    async def _get_action_result(self, _action_result: None) -> CommandProcessingResult:
+        return RESULT_REFRESH_AND_CLEAR
 
     async def __handle_activate(self) -> None:
         LOG.info(

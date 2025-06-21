@@ -8,7 +8,11 @@ from saic_ismart_client_ng.api.vehicle_charging import (
     TargetBatteryCode,
 )
 
-from handlers.command.base import PayloadConvertingCommandHandler
+from handlers.command.base import (
+    RESULT_REFRESH_ONLY,
+    CommandProcessingResult,
+    PayloadConvertingCommandHandler,
+)
 import mqtt_topics
 
 LOG = logging.getLogger(__name__)
@@ -30,7 +34,7 @@ class DrivetrainChargeCurrentLimitCommand(
     @override
     async def handle_typed_payload(
         self, charge_current_limit: ChargeCurrentLimitCode
-    ) -> bool:
+    ) -> CommandProcessingResult:
         LOG.info("Setting charging current limit to %s", str(charge_current_limit))
         await self.saic_api.set_target_battery_soc(
             self.vin,
@@ -38,7 +42,7 @@ class DrivetrainChargeCurrentLimitCommand(
             charge_current_limit=charge_current_limit,
         )
         self.vehicle_state.update_charge_current_limit(charge_current_limit)
-        return True
+        return RESULT_REFRESH_ONLY
 
     @property
     def __desired_target_soc(self) -> TargetBatteryCode:

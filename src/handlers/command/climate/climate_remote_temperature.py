@@ -4,7 +4,11 @@ import logging
 from typing import override
 
 from exceptions import MqttGatewayException
-from handlers.command.base import IntCommandHandler
+from handlers.command.base import (
+    RESULT_REFRESH_ONLY,
+    CommandProcessingResult,
+    IntCommandHandler,
+)
 import mqtt_topics
 
 LOG = logging.getLogger(__name__)
@@ -17,7 +21,7 @@ class ClimateRemoteTemperatureCommand(IntCommandHandler):
         return mqtt_topics.CLIMATE_REMOTE_TEMPERATURE_SET
 
     @override
-    async def handle_typed_payload(self, temp: int) -> bool:
+    async def handle_typed_payload(self, temp: int) -> CommandProcessingResult:
         try:
             LOG.info("Setting remote climate target temperature to %d", temp)
             changed = self.vehicle_state.set_ac_temperature(temp)
@@ -30,4 +34,4 @@ class ClimateRemoteTemperatureCommand(IntCommandHandler):
         except ValueError as e:
             msg = f"Error setting temperature target: {e}"
             raise MqttGatewayException(msg) from e
-        return True
+        return RESULT_REFRESH_ONLY
