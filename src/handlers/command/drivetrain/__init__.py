@@ -22,6 +22,9 @@ from handlers.command.drivetrain.drivetrain_hv_battery_active import (
     DrivetrainHVBatteryActiveCommand,
 )
 from handlers.command.drivetrain.drivetrain_soc_target import DrivetrainSoCTargetCommand
+from handlers.command.drivetrain.drivetrain_total_battery_capacity import (
+    DrivetrainTotalBatteryCapacitySetCommand,
+)
 
 if TYPE_CHECKING:
     from handlers.command import CommandHandlerBase
@@ -33,6 +36,7 @@ ALL_COMMAND_HANDLERS: list[type[CommandHandlerBase]] = [
     DrivetrainChargingCommand,
     DrivetrainHVBatteryActiveCommand,
     DrivetrainSoCTargetCommand,
+    DrivetrainTotalBatteryCapacitySetCommand,
     DrivetrainChargingScheduleCommand,
     DrivetrainChargingCableLockCommand,
 ]

@@ -153,6 +153,19 @@ class HomeAssistantDiscovery(HomeAssistantDiscoveryBase):
             unit_of_measurement="kWh",
             icon="mdi:battery-high",
         )
+        self._publish_number(
+            mqtt_topics.DRIVETRAIN_TOTAL_BATTERY_CAPACITY,
+            "Total Battery Capacity",
+            entity_category="diagnostic",
+            device_class="ENERGY_STORAGE",
+            state_class="measurement",
+            unit_of_measurement="kWh",
+            icon="mdi:battery-high",
+            mode="box",
+            min_value=0.0,
+            step=0.001,
+        )
+
         self._publish_sensor(
             mqtt_topics.DRIVETRAIN_LAST_CHARGE_ENDING_POWER,
             "Last Charge SoC kWh",
