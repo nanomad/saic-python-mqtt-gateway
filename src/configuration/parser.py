@@ -97,6 +97,9 @@ def __parse_mqtt_transport(args: Namespace, config: Configuration) -> None:
             config.mqtt_transport_protocol = TransportProtocol.TLS
             if args.tls_server_cert_path:
                 config.tls_server_cert_path = args.tls_server_cert_path
+                config.tls_server_cert_check_hostname = (
+                    args.tls_server_cert_check_hostname
+                )
         else:
             msg = f"Invalid MQTT URI scheme: {parse_result.scheme}, use tcp or ws"
             raise SystemExit(msg)
@@ -156,7 +159,7 @@ def __setup_osmand(args: Namespace, config: Configuration) -> None:
 
 
 def __setup_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="MQTT Gateway")
+    parser = argparse.ArgumentParser(prog="MQTT Gateway", add_help=True)
     parser.add_argument(
         "-m",
         "--mqtt-uri",
@@ -460,6 +463,20 @@ def __setup_parser() -> argparse.ArgumentParser:
         action=EnvDefault,
         envvar="PUBLISH_RAW_OSMAND_DATA_ENABLED",
         default=False,
+        type=check_bool,
+    )
+    parser.add_argument(
+        "--mqtt-server-cert-check-hostname",
+        help="Enable or disable TLS certificate hostname checking when using custom certificate."
+        "Enabled (True) by default"
+        "Set to (False) when using self-signed certificate without a matching hostname."
+        "This option might be insecure."
+        "Environment Variable: MQTT_SERVER_CERT_CHECK_HOSTNAME",
+        dest="tls_server_cert_check_hostname",
+        required=False,
+        action=EnvDefault,
+        envvar="MQTT_SERVER_CERT_CHECK_HOSTNAME",
+        default=True,
         type=check_bool,
     )
     return parser

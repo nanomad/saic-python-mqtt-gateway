@@ -32,6 +32,7 @@ class Configuration:
         self.mqtt_port: int = 1883
         self.mqtt_transport_protocol: TransportProtocol = TransportProtocol.TCP
         self.tls_server_cert_path: str | None = None
+        self.tls_server_cert_check_hostname: bool = True
         self.mqtt_user: str | None = None
         self.mqtt_password: str | None = None
         self.mqtt_client_id: str = "saic-python-mqtt-gateway"
