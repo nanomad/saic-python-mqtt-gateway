@@ -58,7 +58,11 @@ class MqttPublisher(Publisher):
             if cert_uri:
                 LOG.debug(f"Using custom CA file {cert_uri}")
                 ssl_context.load_verify_locations(cafile=cert_uri)
-                ssl_context.check_hostname = False
+                if not self.configuration.tls_server_cert_check_hostname:
+                    LOG.warning(
+                        f"Skipping hostname check for TLS connection to {self.host}"
+                    )
+                    ssl_context.check_hostname = False
         else:
             ssl_context = None
         await self.client.connect(
