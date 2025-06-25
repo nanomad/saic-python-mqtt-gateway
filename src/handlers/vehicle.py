@@ -116,6 +116,7 @@ class VehicleHandler:
         return OsmAndApi(
             server_uri=self.configuration.osmand_server_uri,
             device_id=osmand_device_id,
+            use_knots=self.configuration.osmand_use_knots,
             listener=api_listener,
         )
 

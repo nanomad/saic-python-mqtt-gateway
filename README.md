@@ -87,6 +87,7 @@ Those parameters can be used to allow the MQTT Gateway to send data to an OsmAnd
 |---------------------------|---------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | --osmand-server-uri       | OSMAND_SERVER_URI               | The URL of your OsmAnd Server                                                                                                                                                                |
 | --osmand-device-id        | OSMAND_DEVICE_ID                | Mapping of VIN to OsmAnd Device Id. Multiple mappings can be provided separated by ',' Example: LSJXXXX=12345-abcdef,LSJYYYY=67890-ghijkl. Defaults to use the car VIN as Device Id if unset |
+| --osmand-use-knots        | OSMAND_USE_KNOTS                | Whether to use knots of kph as a speed unit in OsmAnd messages. Enabled (True) by default to ensure compatibilty with Traccar.                                                               |                                                                                                                      |
 | --publish-raw-osmand-data | PUBLISH_RAW_OSMAND_DATA_ENABLED | Publish raw ABRP OSMAND request/response to MQTT. Disabled (False) by default.                                                                                                               |
 
 ### OpenWB Integration
