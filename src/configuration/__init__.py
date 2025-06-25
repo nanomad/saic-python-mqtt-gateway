@@ -54,6 +54,7 @@ class Configuration:
         # OsmAnd Integration
         self.osmand_device_id_map: dict[str, str] = {}
         self.osmand_server_uri: str | None = None
+        self.osmand_use_knots: bool = True
         self.publish_raw_osmand_data: bool = False
 
     @property

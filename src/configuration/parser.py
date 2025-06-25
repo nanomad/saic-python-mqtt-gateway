@@ -144,10 +144,15 @@ def __setup_abrp(args: Namespace, config: Configuration) -> None:
 
 def __setup_osmand(args: Namespace, config: Configuration) -> None:
     config.osmand_server_uri = args.osmand_server_uri
+
     if args.osmand_device_id:
         cfg_value_to_dict(args.osmand_device_id, config.osmand_device_id_map)
+
     if args.publish_raw_osmand_data is not None:
         config.publish_raw_osmand_data = args.publish_raw_osmand_data
+
+    if args.osmand_use_knots is not None:
+        config.osmand_use_knots = args.osmand_use_knots
 
 
 def __setup_parser() -> argparse.ArgumentParser:
@@ -433,6 +438,18 @@ def __setup_parser() -> argparse.ArgumentParser:
         required=False,
         action=EnvDefault,
         envvar="OSMAND_DEVICE_ID",
+    )
+    parser.add_argument(
+        "--osmand-use-knots",
+        help="Whether to use knots of kph as a speed unit in OsmAnd messages. "
+        "Enabled (True) by default to ensure compatibilty with Traccar. "
+        "Environment Variable: OSMAND_USE_KNOTS",
+        dest="osmand_use_knots",
+        required=False,
+        action=EnvDefault,
+        envvar="OSMAND_USE_KNOTS",
+        default=True,
+        type=check_bool,
     )
     parser.add_argument(
         "--publish-raw-osmand-data",

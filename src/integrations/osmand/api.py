@@ -50,11 +50,13 @@ class OsmAndApi:
         *,
         server_uri: str,
         device_id: str,
+        use_knots: bool,
         listener: OsmAndApiListener | None = None,
     ) -> None:
         self.__device_id = device_id
         self.__listener = listener
         self.__server_uri = server_uri
+        self.__use_knots = use_knots
         self.client = httpx.AsyncClient(
             event_hooks={
                 "request": [self.invoke_request_listener],
@@ -158,12 +160,11 @@ class OsmAndApi:
 
         if basic_vehicle_status.is_parked:
             # We assume the vehicle is stationary, we will update it later from GPS if available
-            data["speed"] = (0.0,)
+            data["speed"] = 0.0
 
         return data
 
-    @staticmethod
-    def __extract_gps_position(gps_position: GpsPosition) -> dict[str, Any]:
+    def __extract_gps_position(self, gps_position: GpsPosition) -> dict[str, Any]:
         data: dict[str, Any] = {}
 
         # Do not use GPS data if it is not available
@@ -176,7 +177,8 @@ class OsmAndApi:
 
         speed = way_point.speed
         if speed is not None and value_in_range(speed, -999, 4500):
-            data["speed"] = speed / 10
+            actual_speed = speed * 0.0539956803 if self.__use_knots else speed / 10.0
+            data["speed"] = actual_speed
 
         heading = way_point.heading
         if heading is not None and value_in_range(heading, 0, 360):
