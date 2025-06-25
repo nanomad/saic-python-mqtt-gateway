@@ -23,7 +23,7 @@ CHARGING_STATIONS_FILE = "charging-stations.json"
 
 
 def process_command_line() -> Configuration:
-    parser = __setup_parser()
+    parser = setup_parser()
     try:
         args = parser.parse_args()
         config = Configuration()
@@ -158,7 +158,7 @@ def __setup_osmand(args: Namespace, config: Configuration) -> None:
         config.osmand_use_knots = args.osmand_use_knots
 
 
-def __setup_parser() -> argparse.ArgumentParser:
+def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="MQTT Gateway", add_help=True)
     parser.add_argument(
         "-m",
