@@ -360,7 +360,7 @@ def __setup_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--charge-min-percentage",
-        help="How many % points we should try to refresh the charge state. Environment Variable: "
+        help="How many percentage points we should try to refresh the charge state. Environment Variable: "
         "CHARGE_MIN_PERCENTAGE",
         dest="charge_dynamic_polling_min_percentage",
         required=False,
