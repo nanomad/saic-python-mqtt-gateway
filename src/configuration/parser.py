@@ -9,6 +9,7 @@ import urllib.parse
 
 from configuration import Configuration, TransportProtocol
 from configuration.argparse_extensions import (
+    ArgumentHelpFormatter,
     EnvDefault,
     cfg_value_to_dict,
     check_bool,
@@ -159,66 +160,74 @@ def __setup_osmand(args: Namespace, config: Configuration) -> None:
 
 
 def setup_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="MQTT Gateway", add_help=True)
-    parser.add_argument(
+    parser = argparse.ArgumentParser(
+        prog="MQTT Gateway", formatter_class=ArgumentHelpFormatter
+    )
+
+    mqtt = parser.add_argument_group("MQTT Broker Configuration")
+    mqtt.add_argument(
         "-m",
         "--mqtt-uri",
-        help="The URI to the MQTT Server. Environment Variable: MQTT_URI,"
-        "TCP: tcp://mqtt.eclipseprojects.io:1883 "
-        "WebSocket: ws://mqtt.eclipseprojects.io:9001"
-        "TLS: tls://mqtt.eclipseprojects.io:8883",
+        help="""The URI to the MQTT Server.
+        TCP: tcp://mqtt.eclipseprojects.io:1883
+        WebSocket: ws://mqtt.eclipseprojects.io:9001
+        TLS: tls://mqtt.eclipseprojects.io:8883""",
         dest="mqtt_uri",
         required=False,
         action=EnvDefault,
         envvar="MQTT_URI",
+        type=str,
     )
-    parser.add_argument(
+    mqtt.add_argument(
         "--mqtt-server-cert",
         help="Path to the server certificate authority file in PEM format for TLS.",
         dest="tls_server_cert_path",
         required=False,
         action=EnvDefault,
         envvar="MQTT_SERVER_CERT",
+        type=str,
     )
-    parser.add_argument(
+    mqtt.add_argument(
         "--mqtt-user",
-        help="The MQTT user name. Environment Variable: MQTT_USER",
+        help="The MQTT user name.",
         dest="mqtt_user",
         required=False,
         action=EnvDefault,
         envvar="MQTT_USER",
+        type=str,
     )
-    parser.add_argument(
+    mqtt.add_argument(
         "--mqtt-password",
-        help="The MQTT password. Environment Variable: MQTT_PASSWORD",
+        help="The MQTT password.",
         dest="mqtt_password",
         required=False,
         action=EnvDefault,
         envvar="MQTT_PASSWORD",
+        type=str,
     )
-    parser.add_argument(
+    mqtt.add_argument(
         "--mqtt-client-id",
-        help="The MQTT Client Identifier. Environment Variable: "
-        "MQTT_CLIENT_ID "
-        "Default is saic-python-mqtt-gateway",
+        help="The MQTT Client Identifier.",
         default="saic-python-mqtt-gateway",
         dest="mqtt_client_id",
         required=False,
         action=EnvDefault,
         envvar="MQTT_CLIENT_ID",
+        type=str,
     )
-    parser.add_argument(
+    mqtt.add_argument(
         "--mqtt-topic-prefix",
-        help="MQTT topic prefix. Environment Variable: MQTT_TOPIC Default is saic",
+        help="MQTT topic prefix.",
         default="saic",
         dest="mqtt_topic",
         required=False,
         action=EnvDefault,
         envvar="MQTT_TOPIC",
+        type=str,
     )
-    parser.add_argument(
+    mqtt.add_argument(
         "--mqtt-allow-dots-in-topic",
-        help="Allow dots in MQTT topics. Environment Variable: MQTT_ALLOW_DOTS_IN_TOPIC Default is True",
+        help="Allow dots in MQTT topics.",
         dest="mqtt_allow_dots_in_topic",
         required=False,
         action=EnvDefault,
@@ -226,252 +235,12 @@ def setup_parser() -> argparse.ArgumentParser:
         type=check_bool,
         envvar="MQTT_ALLOW_DOTS_IN_TOPIC",
     )
-    parser.add_argument(
-        "-s",
-        "--saic-rest-uri",
-        help="The SAIC uri. Environment Variable: SAIC_REST_URI Default is the European "
-        "Production Endpoint: https://tap-eu.soimt.com",
-        default="https://gateway-mg-eu.soimt.com/api.app/v1/",
-        dest="saic_rest_uri",
-        required=False,
-        action=EnvDefault,
-        envvar="SAIC_REST_URI",
-    )
-    parser.add_argument(
-        "-u",
-        "--saic-user",
-        help="The SAIC user name. Environment Variable: SAIC_USER",
-        dest="saic_user",
-        required=True,
-        action=EnvDefault,
-        envvar="SAIC_USER",
-    )
-    parser.add_argument(
-        "-p",
-        "--saic-password",
-        help="The SAIC password. Environment Variable: SAIC_PASSWORD",
-        dest="saic_password",
-        required=True,
-        action=EnvDefault,
-        envvar="SAIC_PASSWORD",
-    )
-    parser.add_argument(
-        "--saic-phone-country-code",
-        help="The SAIC phone country code. Environment Variable: SAIC_PHONE_COUNTRY_CODE",
-        dest="saic_phone_country_code",
-        required=False,
-        action=EnvDefault,
-        envvar="SAIC_PHONE_COUNTRY_CODE",
-    )
-    parser.add_argument(
-        "--saic-region",
-        "--saic-region",
-        help="The SAIC API region. Environment Variable: SAIC_REGION",
-        default="eu",
-        dest="saic_region",
-        required=False,
-        action=EnvDefault,
-        envvar="SAIC_REGION",
-    )
-    parser.add_argument(
-        "--saic-tenant-id",
-        help="The SAIC API tenant id. Environment Variable: SAIC_TENANT_ID",
-        default="459771",
-        dest="saic_tenant_id",
-        required=False,
-        action=EnvDefault,
-        envvar="SAIC_TENANT_ID",
-    )
-    parser.add_argument(
-        "--battery-capacity-mapping",
-        help="The mapping of VIN to full batteryc"
-        " apacity. Multiple mappings can be provided separated"
-        " by , Example: LSJXXXX=54.0,LSJYYYY=64.0,"
-        " Environment Variable: BATTERY_CAPACITY_MAPPING",
-        dest="battery_capacity_mapping",
-        required=False,
-        action=EnvDefault,
-        envvar="BATTERY_CAPACITY_MAPPING",
-    )
-    parser.add_argument(
-        "--charging-stations-json",
-        help="Custom charging stations configuration file name",
-        dest="charging_stations_file",
-        required=False,
-        action=EnvDefault,
-        envvar="CHARGING_STATIONS_JSON",
-    )
-    parser.add_argument(
-        "--saic-relogin-delay",
-        help="How long to wait before attempting another login to the SAIC API. Environment "
-        "Variable: SAIC_RELOGIN_DELAY",
-        dest="saic_relogin_delay",
-        required=False,
-        action=EnvDefault,
-        envvar="SAIC_RELOGIN_DELAY",
-        type=check_positive,
-    )
-    parser.add_argument(
-        "--saic-read-timeout",
-        help="HTTP Read timeout for the SAIC API. Environment "
-        "Variable: SAIC_READ_TIMEOUT",
-        dest="saic_read_timeout",
-        required=False,
-        action=EnvDefault,
-        envvar="SAIC_READ_TIMEOUT",
-        type=check_positive_float,
-    )
-    parser.add_argument(
-        "--ha-discovery",
-        help="Enable Home Assistant Discovery. Environment Variable: HA_DISCOVERY_ENABLED",
-        dest="ha_discovery_enabled",
-        required=False,
-        action=EnvDefault,
-        envvar="HA_DISCOVERY_ENABLED",
-        default=True,
-        type=check_bool,
-    )
-    parser.add_argument(
-        "--ha-discovery-prefix",
-        help="Home Assistant Discovery Prefix. Environment Variable: HA_DISCOVERY_PREFIX",
-        dest="ha_discovery_prefix",
-        required=False,
-        action=EnvDefault,
-        envvar="HA_DISCOVERY_PREFIX",
-        default="homeassistant",
-    )
-    parser.add_argument(
-        "--ha-show-unavailable",
-        help="Show entities as Unavailable in Home Assistant when car polling fails. "
-        "Environment Variable: HA_SHOW_UNAVAILABLE",
-        dest="ha_show_unavailable",
-        required=False,
-        action=EnvDefault,
-        envvar="HA_SHOW_UNAVAILABLE",
-        default=True,
-        type=check_bool,
-    )
-    parser.add_argument(
-        "--messages-request-interval",
-        help="The interval for retrieving messages in seconds. Environment Variable: "
-        "MESSAGES_REQUEST_INTERVAL",
-        dest="messages_request_interval",
-        required=False,
-        action=EnvDefault,
-        envvar="MESSAGES_REQUEST_INTERVAL",
-        default=60,
-    )
-    parser.add_argument(
-        "--charge-min-percentage",
-        help="How many percentage points we should try to refresh the charge state. Environment Variable: "
-        "CHARGE_MIN_PERCENTAGE",
-        dest="charge_dynamic_polling_min_percentage",
-        required=False,
-        action=EnvDefault,
-        envvar="CHARGE_MIN_PERCENTAGE",
-        default="1.0",
-        type=check_positive_float,
-    )
-    parser.add_argument(
-        "--publish-raw-api-data",
-        help="Publish raw SAIC API request/response to MQTT. Environment Variable: "
-        "PUBLISH_RAW_API_DATA_ENABLED",
-        dest="publish_raw_api_data",
-        required=False,
-        action=EnvDefault,
-        envvar="PUBLISH_RAW_API_DATA_ENABLED",
-        default=False,
-        type=check_bool,
-    )
-    # ABRP Integration
-    parser.add_argument(
-        "--abrp-api-key",
-        help="The API key for the A Better Route Planer telemetry API."
-        " Default is the open source telemetry"
-        " API key 8cfc314b-03cd-4efe-ab7d-4431cd8f2e2d."
-        " Environment Variable: ABRP_API_KEY",
-        default="8cfc314b-03cd-4efe-ab7d-4431cd8f2e2d",
-        dest="abrp_api_key",
-        required=False,
-        action=EnvDefault,
-        envvar="ABRP_API_KEY",
-    )
-    parser.add_argument(
-        "--abrp-user-token",
-        help="The mapping of VIN to ABRP User Token."
-        " Multiple mappings can be provided seperated by ,"
-        " Example: LSJXXXX=12345-abcdef,LSJYYYY=67890-ghijkl,"
-        " Environment Variable: ABRP_USER_TOKEN",
-        dest="abrp_user_token",
-        required=False,
-        action=EnvDefault,
-        envvar="ABRP_USER_TOKEN",
-    )
-    parser.add_argument(
-        "--publish-raw-abrp-data",
-        help="Publish raw ABRP API request/response to MQTT. Environment Variable: "
-        "PUBLISH_RAW_ABRP_DATA_ENABLED",
-        dest="publish_raw_abrp_data",
-        required=False,
-        action=EnvDefault,
-        envvar="PUBLISH_RAW_ABRP_DATA_ENABLED",
-        default=False,
-        type=check_bool,
-    )
-    # OsmAnd Integration
-    parser.add_argument(
-        "--osmand-server-uri",
-        help="The URL of your OsmAnd Server."
-        " Default unset"
-        " Environment Variable: OSMAND_SERVER_URI",
-        default=None,
-        dest="osmand_server_uri",
-        required=False,
-        action=EnvDefault,
-        envvar="OSMAND_SERVER_URI",
-    )
-    parser.add_argument(
-        "--osmand-device-id",
-        help="The mapping of VIN to OsmAnd Device ID."
-        " Multiple mappings can be provided seperated by ,"
-        " Example: LSJXXXX=12345-abcdef,LSJYYYY=67890-ghijkl,"
-        " Default is to use the car VIN as Device ID, "
-        " Environment Variable: OSMAND_DEVICE_ID",
-        dest="osmand_device_id",
-        required=False,
-        action=EnvDefault,
-        envvar="OSMAND_DEVICE_ID",
-    )
-    parser.add_argument(
-        "--osmand-use-knots",
-        help="Whether to use knots of kph as a speed unit in OsmAnd messages. "
-        "Enabled (True) by default to ensure compatibilty with Traccar. "
-        "Environment Variable: OSMAND_USE_KNOTS",
-        dest="osmand_use_knots",
-        required=False,
-        action=EnvDefault,
-        envvar="OSMAND_USE_KNOTS",
-        default=True,
-        type=check_bool,
-    )
-    parser.add_argument(
-        "--publish-raw-osmand-data",
-        help="Publish raw ABRP OsmAnd request/response to MQTT. Environment Variable: "
-        "PUBLISH_RAW_OSMAND_DATA_ENABLED",
-        dest="publish_raw_osmand_data",
-        required=False,
-        action=EnvDefault,
-        envvar="PUBLISH_RAW_OSMAND_DATA_ENABLED",
-        default=False,
-        type=check_bool,
-    )
-    parser.add_argument(
+    mqtt.add_argument(
         "--mqtt-server-cert-check-hostname",
-        help="Enable or disable TLS certificate hostname checking when using custom certificate."
-        "Enabled (True) by default"
-        "Set to (False) when using self-signed certificate without a matching hostname."
-        "This option might be insecure."
-        "Environment Variable: MQTT_SERVER_CERT_CHECK_HOSTNAME",
+        help="""\
+            Check TLS certificate hostname when using custom certificate.
+            Set to (False) when using self-signed certificate without a matching hostname.
+            This option might be insecure.""",
         dest="tls_server_cert_check_hostname",
         required=False,
         action=EnvDefault,
@@ -479,6 +248,265 @@ def setup_parser() -> argparse.ArgumentParser:
         default=True,
         type=check_bool,
     )
+
+    saic_api = parser.add_argument_group(
+        "SAIC API Configuration",
+        "Configuration for the SAIC API connection.",
+    )
+    saic_api.add_argument(
+        "-s",
+        "--saic-rest-uri",
+        help="The SAIC uri. Default is European Production Endpoint",
+        default="https://gateway-mg-eu.soimt.com/api.app/v1/",
+        dest="saic_rest_uri",
+        required=False,
+        action=EnvDefault,
+        type=str,
+        envvar="SAIC_REST_URI",
+    )
+    saic_api.add_argument(
+        "-u",
+        "--saic-user",
+        help="The SAIC user name.",
+        dest="saic_user",
+        required=True,
+        action=EnvDefault,
+        envvar="SAIC_USER",
+        type=str,
+    )
+    saic_api.add_argument(
+        "-p",
+        "--saic-password",
+        help="The SAIC password.",
+        dest="saic_password",
+        required=True,
+        action=EnvDefault,
+        envvar="SAIC_PASSWORD",
+        type=str,
+    )
+    saic_api.add_argument(
+        "--saic-phone-country-code",
+        help="The SAIC phone country code.",
+        dest="saic_phone_country_code",
+        required=False,
+        action=EnvDefault,
+        envvar="SAIC_PHONE_COUNTRY_CODE",
+        type=str,
+    )
+    saic_api.add_argument(
+        "--saic-region",
+        "--saic-region",
+        help="The SAIC API region.",
+        default="eu",
+        dest="saic_region",
+        required=False,
+        action=EnvDefault,
+        envvar="SAIC_REGION",
+        type=str,
+    )
+    saic_api.add_argument(
+        "--saic-tenant-id",
+        help="The SAIC API tenant id.",
+        default="459771",
+        dest="saic_tenant_id",
+        required=False,
+        action=EnvDefault,
+        envvar="SAIC_TENANT_ID",
+        type=str,
+    )
+    saic_api.add_argument(
+        "--battery-capacity-mapping",
+        help="""\
+        The mapping of VIN to full battery capacity.
+        Multiple mappings can be provided separated by comma.
+        Example: LSJXXXX=54.0,LSJYYYY=64.0,""",
+        dest="battery_capacity_mapping",
+        required=False,
+        action=EnvDefault,
+        envvar="BATTERY_CAPACITY_MAPPING",
+        type=str,
+    )
+    saic_api.add_argument(
+        "--saic-relogin-delay",
+        help="How long to wait before attempting another login to the SAIC API.",
+        dest="saic_relogin_delay",
+        required=False,
+        action=EnvDefault,
+        envvar="SAIC_RELOGIN_DELAY",
+        type=check_positive,
+    )
+    saic_api.add_argument(
+        "--saic-read-timeout",
+        help="HTTP Read timeout for the SAIC API.",
+        dest="saic_read_timeout",
+        required=False,
+        action=EnvDefault,
+        envvar="SAIC_READ_TIMEOUT",
+        type=check_positive_float,
+    )
+    saic_api.add_argument(
+        "--messages-request-interval",
+        help="The interval for retrieving messages in seconds.",
+        dest="messages_request_interval",
+        required=False,
+        action=EnvDefault,
+        envvar="MESSAGES_REQUEST_INTERVAL",
+        default=60,
+        type=check_positive,
+    )
+    saic_api.add_argument(
+        "--charge-min-percentage",
+        help="How many percentage points we should try to refresh the charge state.",
+        dest="charge_dynamic_polling_min_percentage",
+        required=False,
+        action=EnvDefault,
+        envvar="CHARGE_MIN_PERCENTAGE",
+        default="1.0",
+        type=check_positive_float,
+    )
+    saic_api.add_argument(
+        "--publish-raw-api-data",
+        help="Publish raw SAIC API request/response to MQTT.",
+        dest="publish_raw_api_data",
+        required=False,
+        action=EnvDefault,
+        envvar="PUBLISH_RAW_API_DATA_ENABLED",
+        default=False,
+        type=check_bool,
+    )
+
+    openwb_integration = parser.add_argument_group(
+        "OpenWB Integration", "Configuration for the OpenWB integration."
+    )
+    openwb_integration.add_argument(
+        "--charging-stations-json",
+        help="Custom charging stations configuration file name",
+        dest="charging_stations_file",
+        required=False,
+        action=EnvDefault,
+        envvar="CHARGING_STATIONS_JSON",
+        type=str,
+    )
+
+    homeassistant_integration = parser.add_argument_group(
+        "Home Assistant Integration",
+        "Configuration for the Home Assistant integration.",
+    )
+    homeassistant_integration.add_argument(
+        "--ha-discovery",
+        help="Enable Home Assistant Discovery.",
+        dest="ha_discovery_enabled",
+        required=False,
+        action=EnvDefault,
+        envvar="HA_DISCOVERY_ENABLED",
+        default=True,
+        type=check_bool,
+    )
+    homeassistant_integration.add_argument(
+        "--ha-discovery-prefix",
+        help="Home Assistant Discovery Prefix.",
+        dest="ha_discovery_prefix",
+        required=False,
+        action=EnvDefault,
+        envvar="HA_DISCOVERY_PREFIX",
+        default="homeassistant",
+    )
+    homeassistant_integration.add_argument(
+        "--ha-show-unavailable",
+        help="Show entities as Unavailable in Home Assistant when car polling fails.",
+        dest="ha_show_unavailable",
+        required=False,
+        action=EnvDefault,
+        envvar="HA_SHOW_UNAVAILABLE",
+        default=True,
+        type=check_bool,
+    )
+
+    abrp_integration = parser.add_argument_group(
+        "A Better Route Planner (ABRP) Integration",
+        "Configuration for the A Better Route Planner integration.",
+    )
+    # ABRP Integration
+    abrp_integration.add_argument(
+        "--abrp-api-key",
+        help="The API key for the A Better Route Planer telemetry API.",
+        default="8cfc314b-03cd-4efe-ab7d-4431cd8f2e2d",
+        dest="abrp_api_key",
+        required=False,
+        action=EnvDefault,
+        envvar="ABRP_API_KEY",
+        type=str,
+    )
+    abrp_integration.add_argument(
+        "--abrp-user-token",
+        help="""The mapping of VIN to ABRP User Token.
+        Multiple mappings can be provided seperated by ,
+        Example: LSJXXXX=12345-abcdef,LSJYYYY=67890-ghijkl,""",
+        dest="abrp_user_token",
+        required=False,
+        action=EnvDefault,
+        envvar="ABRP_USER_TOKEN",
+        type=str,
+    )
+    abrp_integration.add_argument(
+        "--publish-raw-abrp-data",
+        help="Publish raw ABRP API request/response to MQTT.",
+        dest="publish_raw_abrp_data",
+        required=False,
+        action=EnvDefault,
+        envvar="PUBLISH_RAW_ABRP_DATA_ENABLED",
+        default=False,
+        type=check_bool,
+    )
+
+    # OsmAnd Integration
+    osmand_integration = parser.add_argument_group(
+        "OsmAnd Integration",
+        "Configuration for the OsmAnd integration.",
+    )
+    osmand_integration.add_argument(
+        "--osmand-server-uri",
+        help="The URL of your OsmAnd Server.",
+        default=None,
+        dest="osmand_server_uri",
+        required=False,
+        action=EnvDefault,
+        envvar="OSMAND_SERVER_URI",
+        type=str,
+    )
+    osmand_integration.add_argument(
+        "--osmand-device-id",
+        help="""The mapping of VIN to OsmAnd Device ID.
+        Multiple mappings can be provided seperated by ,
+        Example: LSJXXXX=12345-abcdef,LSJYYYY=67890-ghijkl,
+        Uses the car VIN as Device ID if not set""",
+        dest="osmand_device_id",
+        required=False,
+        action=EnvDefault,
+        envvar="OSMAND_DEVICE_ID",
+        type=str,
+    )
+    osmand_integration.add_argument(
+        "--osmand-use-knots",
+        help="Whether to use knots of kph as a speed unit in OsmAnd messages to ensure compatibilty with Traccar.",
+        dest="osmand_use_knots",
+        required=False,
+        action=EnvDefault,
+        envvar="OSMAND_USE_KNOTS",
+        default=True,
+        type=check_bool,
+    )
+    osmand_integration.add_argument(
+        "--publish-raw-osmand-data",
+        help="Publish raw ABRP OsmAnd request/response to MQTT.",
+        dest="publish_raw_osmand_data",
+        required=False,
+        action=EnvDefault,
+        envvar="PUBLISH_RAW_OSMAND_DATA_ENABLED",
+        default=False,
+        type=check_bool,
+    )
+
     return parser
 
 
