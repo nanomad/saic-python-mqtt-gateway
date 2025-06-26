@@ -161,17 +161,30 @@ def __setup_osmand(args: Namespace, config: Configuration) -> None:
 
 def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="MQTT Gateway", formatter_class=ArgumentHelpFormatter
+        prog="SAIC MQTT Gateway", formatter_class=ArgumentHelpFormatter
     )
 
+    __add_mqtt_argument_group(parser)
+    __add_saic_api_argument_group(parser)
+    __add_openwb_argument_group(parser)
+    __add_homeassistant_argument_group(parser)
+    __add_abrp_argument_group(parser)
+    add_osmand_argument_group(parser)
+
+    return parser
+
+
+def __add_mqtt_argument_group(
+    parser: argparse.ArgumentParser,
+) -> argparse._ArgumentGroup:
     mqtt = parser.add_argument_group("MQTT Broker Configuration")
     mqtt.add_argument(
         "-m",
         "--mqtt-uri",
         help="""The URI to the MQTT Server.
-        TCP: tcp://mqtt.eclipseprojects.io:1883
-        WebSocket: ws://mqtt.eclipseprojects.io:9001
-        TLS: tls://mqtt.eclipseprojects.io:8883""",
+                TCP: tcp://mqtt.eclipseprojects.io:1883
+                WebSocket: ws://mqtt.eclipseprojects.io:9001
+                TLS: tls://mqtt.eclipseprojects.io:8883""",
         dest="mqtt_uri",
         required=False,
         action=EnvDefault,
@@ -180,7 +193,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     mqtt.add_argument(
         "--mqtt-server-cert",
-        help="Path to the server certificate authority file in PEM format for TLS.",
+        help="""Path to the server certificate authority file in PEM format for TLS.""",
         dest="tls_server_cert_path",
         required=False,
         action=EnvDefault,
@@ -189,7 +202,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     mqtt.add_argument(
         "--mqtt-user",
-        help="The MQTT user name.",
+        help="""The MQTT user name.""",
         dest="mqtt_user",
         required=False,
         action=EnvDefault,
@@ -198,7 +211,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     mqtt.add_argument(
         "--mqtt-password",
-        help="The MQTT password.",
+        help="""The MQTT password.""",
         dest="mqtt_password",
         required=False,
         action=EnvDefault,
@@ -207,7 +220,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     mqtt.add_argument(
         "--mqtt-client-id",
-        help="The MQTT Client Identifier.",
+        help="""The MQTT Client Identifier.""",
         default="saic-python-mqtt-gateway",
         dest="mqtt_client_id",
         required=False,
@@ -217,7 +230,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     mqtt.add_argument(
         "--mqtt-topic-prefix",
-        help="MQTT topic prefix.",
+        help="""MQTT topic prefix.""",
         default="saic",
         dest="mqtt_topic",
         required=False,
@@ -227,7 +240,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     mqtt.add_argument(
         "--mqtt-allow-dots-in-topic",
-        help="Allow dots in MQTT topics.",
+        help="""Allow dots in MQTT topics.""",
         dest="mqtt_allow_dots_in_topic",
         required=False,
         action=EnvDefault,
@@ -237,10 +250,9 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     mqtt.add_argument(
         "--mqtt-server-cert-check-hostname",
-        help="""\
-            Check TLS certificate hostname when using custom certificate.
-            Set to (False) when using self-signed certificate without a matching hostname.
-            This option might be insecure.""",
+        help="""Check TLS certificate hostname when using custom certificate.
+                Set to (False) when using self-signed certificate without a matching hostname.
+                This option might be insecure.""",
         dest="tls_server_cert_check_hostname",
         required=False,
         action=EnvDefault,
@@ -248,7 +260,12 @@ def setup_parser() -> argparse.ArgumentParser:
         default=True,
         type=check_bool,
     )
+    return mqtt
 
+
+def __add_saic_api_argument_group(
+    parser: argparse.ArgumentParser,
+) -> argparse._ArgumentGroup:
     saic_api = parser.add_argument_group(
         "SAIC API Configuration",
         "Configuration for the SAIC API connection.",
@@ -256,7 +273,7 @@ def setup_parser() -> argparse.ArgumentParser:
     saic_api.add_argument(
         "-s",
         "--saic-rest-uri",
-        help="The SAIC uri. Default is European Production Endpoint",
+        help="""The SAIC uri. Default is European Production Endpoint""",
         default="https://gateway-mg-eu.soimt.com/api.app/v1/",
         dest="saic_rest_uri",
         required=False,
@@ -267,7 +284,7 @@ def setup_parser() -> argparse.ArgumentParser:
     saic_api.add_argument(
         "-u",
         "--saic-user",
-        help="The SAIC user name.",
+        help="""The SAIC user name.""",
         dest="saic_user",
         required=True,
         action=EnvDefault,
@@ -277,7 +294,7 @@ def setup_parser() -> argparse.ArgumentParser:
     saic_api.add_argument(
         "-p",
         "--saic-password",
-        help="The SAIC password.",
+        help="""The SAIC password.""",
         dest="saic_password",
         required=True,
         action=EnvDefault,
@@ -286,7 +303,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     saic_api.add_argument(
         "--saic-phone-country-code",
-        help="The SAIC phone country code.",
+        help="""The SAIC phone country code.""",
         dest="saic_phone_country_code",
         required=False,
         action=EnvDefault,
@@ -295,8 +312,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     saic_api.add_argument(
         "--saic-region",
-        "--saic-region",
-        help="The SAIC API region.",
+        help="""The SAIC API region.""",
         default="eu",
         dest="saic_region",
         required=False,
@@ -306,7 +322,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     saic_api.add_argument(
         "--saic-tenant-id",
-        help="The SAIC API tenant id.",
+        help="""The SAIC API tenant id.""",
         default="459771",
         dest="saic_tenant_id",
         required=False,
@@ -316,10 +332,9 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     saic_api.add_argument(
         "--battery-capacity-mapping",
-        help="""\
-        The mapping of VIN to full battery capacity.
-        Multiple mappings can be provided separated by comma.
-        Example: LSJXXXX=54.0,LSJYYYY=64.0,""",
+        help="""The mapping of VIN to full battery capacity.
+                Multiple mappings can be provided separated by comma.
+                Example: LSJXXXX=54.0,LSJYYYY=64.0,""",
         dest="battery_capacity_mapping",
         required=False,
         action=EnvDefault,
@@ -328,7 +343,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     saic_api.add_argument(
         "--saic-relogin-delay",
-        help="How long to wait before attempting another login to the SAIC API.",
+        help="""How long to wait before attempting another login to the SAIC API.""",
         dest="saic_relogin_delay",
         required=False,
         action=EnvDefault,
@@ -337,7 +352,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     saic_api.add_argument(
         "--saic-read-timeout",
-        help="HTTP Read timeout for the SAIC API.",
+        help="""HTTP Read timeout for the SAIC API.""",
         dest="saic_read_timeout",
         required=False,
         action=EnvDefault,
@@ -346,7 +361,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     saic_api.add_argument(
         "--messages-request-interval",
-        help="The interval for retrieving messages in seconds.",
+        help="""The interval for retrieving messages in seconds.""",
         dest="messages_request_interval",
         required=False,
         action=EnvDefault,
@@ -356,7 +371,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     saic_api.add_argument(
         "--charge-min-percentage",
-        help="How many percentage points we should try to refresh the charge state.",
+        help="""How many percentage points we should try to refresh the charge state.""",
         dest="charge_dynamic_polling_min_percentage",
         required=False,
         action=EnvDefault,
@@ -366,7 +381,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     saic_api.add_argument(
         "--publish-raw-api-data",
-        help="Publish raw SAIC API request/response to MQTT.",
+        help="""Publish raw SAIC API request/response to MQTT.""",
         dest="publish_raw_api_data",
         required=False,
         action=EnvDefault,
@@ -374,27 +389,37 @@ def setup_parser() -> argparse.ArgumentParser:
         default=False,
         type=check_bool,
     )
+    return saic_api
 
+
+def __add_openwb_argument_group(
+    parser: argparse.ArgumentParser,
+) -> argparse._ArgumentGroup:
     openwb_integration = parser.add_argument_group(
         "OpenWB Integration", "Configuration for the OpenWB integration."
     )
     openwb_integration.add_argument(
         "--charging-stations-json",
-        help="Custom charging stations configuration file name",
+        help="""Custom charging stations configuration file name""",
         dest="charging_stations_file",
         required=False,
         action=EnvDefault,
         envvar="CHARGING_STATIONS_JSON",
         type=str,
     )
+    return openwb_integration
 
+
+def __add_homeassistant_argument_group(
+    parser: argparse.ArgumentParser,
+) -> argparse._ArgumentGroup:
     homeassistant_integration = parser.add_argument_group(
         "Home Assistant Integration",
         "Configuration for the Home Assistant integration.",
     )
     homeassistant_integration.add_argument(
         "--ha-discovery",
-        help="Enable Home Assistant Discovery.",
+        help="""Enable Home Assistant Discovery.""",
         dest="ha_discovery_enabled",
         required=False,
         action=EnvDefault,
@@ -404,7 +429,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     homeassistant_integration.add_argument(
         "--ha-discovery-prefix",
-        help="Home Assistant Discovery Prefix.",
+        help="""Home Assistant Discovery Prefix.""",
         dest="ha_discovery_prefix",
         required=False,
         action=EnvDefault,
@@ -413,7 +438,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     homeassistant_integration.add_argument(
         "--ha-show-unavailable",
-        help="Show entities as Unavailable in Home Assistant when car polling fails.",
+        help="""Show entities as Unavailable in Home Assistant when car polling fails.""",
         dest="ha_show_unavailable",
         required=False,
         action=EnvDefault,
@@ -421,15 +446,19 @@ def setup_parser() -> argparse.ArgumentParser:
         default=True,
         type=check_bool,
     )
+    return homeassistant_integration
 
+
+def __add_abrp_argument_group(
+    parser: argparse.ArgumentParser,
+) -> argparse._ArgumentGroup:
     abrp_integration = parser.add_argument_group(
         "A Better Route Planner (ABRP) Integration",
         "Configuration for the A Better Route Planner integration.",
     )
-    # ABRP Integration
     abrp_integration.add_argument(
         "--abrp-api-key",
-        help="The API key for the A Better Route Planer telemetry API.",
+        help="""The API key for the A Better Route Planer telemetry API.""",
         default="8cfc314b-03cd-4efe-ab7d-4431cd8f2e2d",
         dest="abrp_api_key",
         required=False,
@@ -440,8 +469,8 @@ def setup_parser() -> argparse.ArgumentParser:
     abrp_integration.add_argument(
         "--abrp-user-token",
         help="""The mapping of VIN to ABRP User Token.
-        Multiple mappings can be provided seperated by ,
-        Example: LSJXXXX=12345-abcdef,LSJYYYY=67890-ghijkl,""",
+                Multiple mappings can be provided seperated by ,
+                Example: LSJXXXX=12345-abcdef,LSJYYYY=67890-ghijkl,""",
         dest="abrp_user_token",
         required=False,
         action=EnvDefault,
@@ -450,7 +479,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     abrp_integration.add_argument(
         "--publish-raw-abrp-data",
-        help="Publish raw ABRP API request/response to MQTT.",
+        help="""Publish raw ABRP API request/response to MQTT.""",
         dest="publish_raw_abrp_data",
         required=False,
         action=EnvDefault,
@@ -458,15 +487,19 @@ def setup_parser() -> argparse.ArgumentParser:
         default=False,
         type=check_bool,
     )
+    return abrp_integration
 
-    # OsmAnd Integration
+
+def add_osmand_argument_group(
+    parser: argparse.ArgumentParser,
+) -> argparse._ArgumentGroup:
     osmand_integration = parser.add_argument_group(
         "OsmAnd Integration",
         "Configuration for the OsmAnd integration.",
     )
     osmand_integration.add_argument(
         "--osmand-server-uri",
-        help="The URL of your OsmAnd Server.",
+        help="""The URL of your OsmAnd Server.""",
         default=None,
         dest="osmand_server_uri",
         required=False,
@@ -477,9 +510,9 @@ def setup_parser() -> argparse.ArgumentParser:
     osmand_integration.add_argument(
         "--osmand-device-id",
         help="""The mapping of VIN to OsmAnd Device ID.
-        Multiple mappings can be provided seperated by ,
-        Example: LSJXXXX=12345-abcdef,LSJYYYY=67890-ghijkl,
-        Uses the car VIN as Device ID if not set""",
+                Multiple mappings can be provided seperated by ,
+                Example: LSJXXXX=12345-abcdef,LSJYYYY=67890-ghijkl,
+                Uses the car VIN as Device ID if not set""",
         dest="osmand_device_id",
         required=False,
         action=EnvDefault,
@@ -488,7 +521,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     osmand_integration.add_argument(
         "--osmand-use-knots",
-        help="Whether to use knots of kph as a speed unit in OsmAnd messages to ensure compatibilty with Traccar.",
+        help="""Whether to use knots of kph as a speed unit in OsmAnd messages to ensure compatibilty with Traccar.""",
         dest="osmand_use_knots",
         required=False,
         action=EnvDefault,
@@ -498,7 +531,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     osmand_integration.add_argument(
         "--publish-raw-osmand-data",
-        help="Publish raw ABRP OsmAnd request/response to MQTT.",
+        help="""Publish raw ABRP OsmAnd request/response to MQTT.""",
         dest="publish_raw_osmand_data",
         required=False,
         action=EnvDefault,
@@ -506,8 +539,7 @@ def setup_parser() -> argparse.ArgumentParser:
         default=False,
         type=check_bool,
     )
-
-    return parser
+    return osmand_integration
 
 
 def __process_charging_stations_file(config: Configuration, json_file: str) -> None:
