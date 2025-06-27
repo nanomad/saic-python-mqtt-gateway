@@ -2,11 +2,46 @@ from __future__ import annotations
 
 import argparse
 from argparse import ArgumentParser, Namespace
+from gettext import gettext as _
 import os
 from typing import TYPE_CHECKING, Any, override
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
+
+
+class ArgumentHelpFormatter(argparse.RawTextHelpFormatter):
+    """Custom argument formatter.
+
+    Appends environment variable and default value to help.
+    """
+
+    def _get_help_string(self, action: argparse.Action) -> str | None:
+        _help = action.help
+        if _help is None:
+            _help = ""
+
+        if isinstance(action, EnvDefault):
+            # append type
+            t = action.type
+            if t is not None:
+                if (
+                    hasattr(t, "__annotations__")
+                    and t.__annotations__.get("return", None) is not None
+                ):
+                    _help += f"\n(type: {t.__annotations__.get('return', None)})"
+                elif hasattr(t, "__name__"):
+                    _help += f"\n(type: {t.__name__})"
+
+            if "%(default)" not in _help and action.default is not argparse.SUPPRESS:
+                defaulting_nargs = [argparse.OPTIONAL, argparse.ZERO_OR_MORE]
+                if action.option_strings or action.nargs in defaulting_nargs:
+                    # append default value
+                    _help += _("\n(default: %(default)s)")
+            # append environment variable
+            _help += f"\n(environment variable: {action.envvar})"
+        # whitespace from each line
+        return "\n".join([m.lstrip() for m in _help.split("\n")])
 
 
 class EnvDefault(argparse.Action):
@@ -17,6 +52,7 @@ class EnvDefault(argparse.Action):
         default: str | None = None,
         **kwargs: dict[str, Any],
     ) -> None:
+        self.envvar = envvar
         if os.environ.get(envvar):
             default = os.environ[envvar]
         if required and default:
