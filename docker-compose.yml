@@ -13,4 +13,5 @@ services:
       - SAIC_PASSWORD=${SAIC_PWD}
       - CHARGING_STATIONS_JSON=/usr/src/app/config/charging-stations.json
     volumes:
+      # - ./.secret.env:/usr/src/app/.env:ro  # Uncomment to use a secret environment file
       - ./examples:/usr/src/app/config/

@@ -6,8 +6,14 @@ from gettext import gettext as _
 import os
 from typing import TYPE_CHECKING, Any, override
 
+from dotenv import dotenv_values
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
+
+
+# load .env file and merge with os.environ
+merged_environ = {**dotenv_values(".env"), **os.environ}
 
 
 class ArgumentHelpFormatter(argparse.RawTextHelpFormatter):
@@ -40,7 +46,7 @@ class ArgumentHelpFormatter(argparse.RawTextHelpFormatter):
                     _help += _("\n(default: %(default)s)")
             # append environment variable
             _help += f"\n(environment variable: {action.envvar})"
-        # whitespace from each line
+        # strip whitespace from each line
         return "\n".join([m.lstrip() for m in _help.split("\n")])
 
 
@@ -53,8 +59,8 @@ class EnvDefault(argparse.Action):
         **kwargs: dict[str, Any],
     ) -> None:
         self.envvar = envvar
-        if os.environ.get(envvar):
-            default = os.environ[envvar]
+        if merged_environ.get(envvar):
+            default = merged_environ[envvar]
         if required and default:
             required = False
         super().__init__(default=default, required=required, **kwargs)

@@ -14,8 +14,17 @@ the [SAIC-iSmart-API Documentation](https://github.com/SAIC-iSmart-API/documenta
 
 ## Configuration
 
-Configuration parameters can be provided as command line parameters or environment variables (this is what you typically
+Configuration parameters can be provided as
+ * Command line parameters
+ * Environment variables (this is what you typically
 do when you run the service from a docker container).
+ * A local [.env file](https://saurabh-kumar.com/python-dotenv/#file-format) in current working directory (`CWD`) where the program is started from. When running in docker container the `CWD` container root is `/usr/src/app`.
+
+When using combinations of configuration methods, the order of precedence is as follows.
+
+  1. Command line parameters
+  2. Environment variables
+  3. Local .env file
 
 ### SAIC API
 
@@ -151,7 +160,9 @@ $ docker build -t saic-mqtt-gateway .
 
 There is a [docker compose file](docker-compose.yml) that shows how to set up the service.
 
-First setup the hidden ".env" file in the root directory of the project with your specific data
+First setup the hidden `.env` file in the root directory of the project with your specific data. The contents of this file will populate environment variables inside the container. 
+
+Alternatively, if you are conserned about security you can define your variables inside `.secret.env` and mount this file as `/.env` in the container.
 
 Test your setup with
 ```
