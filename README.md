@@ -162,7 +162,7 @@ There is a [docker compose file](docker-compose.yml) that shows how to set up th
 
 First setup the hidden `.env` file in the root directory of the project with your specific data. The contents of this file will populate environment variables inside the container. 
 
-Alternatively, if you are conserned about security you can define your variables inside `.secret.env` and mount this file as `/.env` in the container.
+Alternatively, if you are conserned about security you can define your variables inside `.secret.env` and mount this file as `/usr/src/app/.env` in the container.
 
 Test your setup with
 ```
