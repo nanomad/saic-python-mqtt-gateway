@@ -1,6 +1,7 @@
 import asyncio
 import faulthandler
 import logging
+import os
 import signal
 import sys
 from random import uniform
@@ -230,6 +231,10 @@ if __name__ == '__main__':
     from log_config import setup_logging, debug_log_enabled
 
     setup_logging()
+
+    LOG.info(
+        f"Starting SAIC MQTT Gateway version {os.environ.get('RELEASE_VERSION', 'unknown')}"
+    )
 
     # Enable fault handler to get a thread dump on SIGQUIT
     faulthandler.enable(file=sys.stderr, all_threads=True)

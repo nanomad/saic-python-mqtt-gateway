@@ -45,6 +45,7 @@ LABEL mqtt.gateway.description="Python MQTT Gateway"
 
 WORKDIR /usr/src/app
 
+ENV RELEASE_VERSION=${RELEASE_VERSION}
 ENV VIRTUAL_ENV=/usr/src/app/.venv
 ENV PATH="/usr/src/app/.venv/bin:$PATH"
 
