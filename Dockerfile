@@ -40,8 +40,8 @@ FROM python:${PYTHON_VERSION}-slim AS runtime
 
 ARG RELEASE_VERSION=latest
 
-LABEL mqtt.gateway.version="${RELEASE_VERSION}"
-LABEL mqtt.gateway.description="Python MQTT Gateway"
+LABEL saic.mqtt.gateway.version="${RELEASE_VERSION}"
+LABEL saic.mqtt.gateway.description="SAIC MQTT Gateway: A Python-based service that queries the SAIC API, processes the data, and publishes it to an MQTT broker."
 
 WORKDIR /usr/src/app
 
