@@ -3,11 +3,6 @@ ARG PYTHON_VERSION=3.12
 
 FROM weastur/poetry:${POETRY_VERSION}-python-${PYTHON_VERSION} AS builder
 
-ARG RELEASE_VERSION=latest
-
-LABEL mqtt.gateway.version="${RELEASE_VERSION}"
-LABEL mqtt.gateway.description="Python MQTT Gateway"
-
 ENV POETRY_HOME=/opt/poetry
 ENV POETRY_NO_INTERACTION=1
 ENV POETRY_VIRTUALENVS_IN_PROJECT=1
@@ -42,6 +37,11 @@ RUN --mount=type=tmpfs,target=/root/.cargo poetry install --no-root && rm -rf $P
 # Now let's build the runtime image from the builder.
 #   We'll just copy the env and the PATH reference.
 FROM python:${PYTHON_VERSION}-slim AS runtime
+
+ARG RELEASE_VERSION=latest
+
+LABEL mqtt.gateway.version="${RELEASE_VERSION}"
+LABEL mqtt.gateway.description="Python MQTT Gateway"
 
 WORKDIR /usr/src/app
 
