@@ -3,6 +3,11 @@ ARG PYTHON_VERSION=3.12
 
 FROM weastur/poetry:${POETRY_VERSION}-python-${PYTHON_VERSION} AS builder
 
+ARG RELEASE_VERSION=latest
+
+LABEL mqtt.gateway.version="${RELEASE_VERSION}"
+LABEL mqtt.gateway.description="Python MQTT Gateway"
+
 ENV POETRY_HOME=/opt/poetry
 ENV POETRY_NO_INTERACTION=1
 ENV POETRY_VIRTUALENVS_IN_PROJECT=1
