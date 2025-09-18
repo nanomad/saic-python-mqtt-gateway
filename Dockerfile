@@ -18,8 +18,14 @@ RUN poetry install --no-root && rm -rf $POETRY_CACHE_DIR
 #   We'll just copy the env and the PATH reference.
 FROM python:${PYTHON_VERSION}-slim AS runtime
 
+ARG RELEASE_VERSION=latest
+
+LABEL saic.mqtt.gateway.version="${RELEASE_VERSION}"
+LABEL saic.mqtt.gateway.description="SAIC MQTT Gateway: A Python-based service that queries the SAIC API, processes the data, and publishes it to an MQTT broker."
+
 WORKDIR /usr/src/app
 
+ENV RELEASE_VERSION=${RELEASE_VERSION}
 ENV VIRTUAL_ENV=/usr/src/app/.venv
 ENV PATH="/usr/src/app/.venv/bin:$PATH"
 
