@@ -52,6 +52,8 @@ jobs:
         if: env.DOCKERHUB_ORGANIZATION == null
         with:
           context: .
+          build-args: |
+            RELEASE_VERSION=${{ env.RELEASE_VERSION }}
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           tags: |
@@ -63,6 +65,8 @@ jobs:
         if: env.DOCKERHUB_ORGANIZATION != null
         with:
           context: .
+          build-args: |
+            RELEASE_VERSION=${{ env.RELEASE_VERSION }}
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           tags: |
