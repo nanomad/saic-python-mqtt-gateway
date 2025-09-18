@@ -50,7 +50,7 @@ class OpenWBIntegration:
         soc_topic = self.__charging_station.soc_topic
         soc = extractors.extract_soc(vehicle_status, charge_status)
         if soc is not None and soc_topic is not None:
-            LOG.info("OpenWB Integration published SoC to %f", soc_topic)
+            LOG.info("OpenWB Integration published SoC to %s", soc_topic)
             self.__publisher.publish_float(
                 key=soc_topic,
                 value=soc,
