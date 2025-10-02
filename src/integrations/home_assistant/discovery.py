@@ -1041,6 +1041,7 @@ class HomeAssistantDiscovery:
     def __get_common_attributes(
         self,
         unique_id: str,
+        domain: str,
         name: str,
         custom_availability: HaCustomAvailabilityConfig | None = None,
     ) -> dict[str, Any]:
@@ -1048,7 +1049,7 @@ class HomeAssistantDiscovery:
             "name": name,
             "device": self.__get_device_node(),
             "unique_id": unique_id,
-            "object_id": unique_id,
+            "default_entity_id": f"{domain}.{unique_id}",
         }
 
         if custom_availability is not None:
@@ -1107,7 +1108,7 @@ class HomeAssistantDiscovery:
         vin = self.vin
         unique_id = f"{vin}_{snake_case(sensor_name)}"
         final_payload = (
-            self.__get_common_attributes(unique_id, sensor_name, custom_availability)
+            self.__get_common_attributes(unique_id, sensor_type, sensor_name, custom_availability)
             | payload
         )
         ha_topic = (
