@@ -1049,6 +1049,7 @@ class HomeAssistantDiscovery:
             "name": name,
             "device": self.__get_device_node(),
             "unique_id": unique_id,
+            "object_id": unique_id,
             "default_entity_id": f"{domain}.{unique_id}",
         }
 
