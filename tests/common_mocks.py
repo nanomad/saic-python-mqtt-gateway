@@ -130,7 +130,11 @@ def get_mock_vehicle_status_resp() -> VehicleStatusResp:
     )
 
 
-def get_mock_charge_management_data_resp() -> ChrgMgmtDataResp:
+def get_mock_charge_management_data_resp(
+    *,
+    bms_on_bd_chrg_trgt_soc_dsp_cmd: int | None = None,
+    bms_reser_ctrl_dsp_cmd: int | None = None,
+) -> ChrgMgmtDataResp:
     return ChrgMgmtDataResp(
         chrgMgmtData=ChrgMgmtData(
             bmsPackCrntV=0,
@@ -140,6 +144,8 @@ def get_mock_charge_management_data_resp() -> ChrgMgmtDataResp:
             bmsEstdElecRng=int(DRIVETRAIN_HYBRID_ELECTRICAL_RANGE * 10.0),
             ccuEleccLckCtrlDspCmd=1,
             bmsChrgSts=1 if DRIVETRAIN_CHARGING else 0,
+            bmsOnBdChrgTrgtSOCDspCmd=bms_on_bd_chrg_trgt_soc_dsp_cmd,
+            bmsReserCtrlDspCmd=bms_reser_ctrl_dsp_cmd,
         ),
         rvsChargeStatus=RvsChargeStatus(
             mileageOfDay=int(DRIVETRAIN_MILEAGE_OF_DAY * 10.0),
