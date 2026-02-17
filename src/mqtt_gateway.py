@@ -208,6 +208,13 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
             LOG.debug(f"Charging detected for unknown vin {vin}")
 
     @override
+    def on_mqtt_reconnected(self) -> None:
+        LOG.info("MQTT reconnected, resetting HA discovery for all vehicles")
+        for vin, vh in self.vehicle_handlers.items():
+            LOG.debug(f"Resetting HA discovery for vehicle {vin}")
+            vh.reset_ha_discovery()
+
+    @override
     async def on_mqtt_global_command_received(
         self, *, topic: str, payload: str
     ) -> None:

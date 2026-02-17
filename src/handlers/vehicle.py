@@ -264,7 +264,13 @@ class VehicleHandler:
             LOG.info(
                 f"Sending HA discovery messages for {self.vin_info.vin} (Force: {force})"
             )
-            self.__ha_discovery.publish_ha_discovery_messages(force=force)
+            published = self.__ha_discovery.publish_ha_discovery_messages(force=force)
+            if published:
+                self.vehicle_state.republish_command_states()
+
+    def reset_ha_discovery(self) -> None:
+        if self.__ha_discovery is not None:
+            self.__ha_discovery.published = False
 
     async def update_vehicle_status(
         self,
