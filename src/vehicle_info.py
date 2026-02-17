@@ -116,6 +116,8 @@ class VehicleInfo:
 
         if self.series.startswith("EH32"):
             result = self.__mg4_real_battery_capacity
+        elif self.series.startswith("EC32"):
+            result = self.__cyberster_real_battery_capacity
         elif self.series.startswith("EP2"):
             result = self.__mg5_real_battery_capacity
         elif self.series.startswith("ZS EV"):
@@ -138,6 +140,11 @@ class VehicleInfo:
             return 64.0
         # MG4 with LFP battery
         return 51.0
+
+    @property
+    def __cyberster_real_battery_capacity(self) -> float | None:
+        # Model: MG Cyberster
+        return 72.5
 
     @property
     def __mg5_real_battery_capacity(self) -> float | None:
