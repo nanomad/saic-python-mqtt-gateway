@@ -6,10 +6,14 @@ import unittest
 from apscheduler.schedulers.blocking import BlockingScheduler
 import pytest
 from saic_ismart_client_ng.api.vehicle.schema import VinInfo
+from saic_ismart_client_ng.api.vehicle_charging import (
+    ChargeCurrentLimitCode,
+    TargetBatteryCode,
+)
 
 from configuration import Configuration
 import mqtt_topics
-from vehicle import VehicleState
+from vehicle import RefreshMode, VehicleState
 from vehicle_info import VehicleInfo
 
 from .common_mocks import (
@@ -123,6 +127,64 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
         assert result.target_soc is None
         assert result.scheduled_charging is None
         assert self.get_topic(mqtt_topics.DRIVETRAIN_SOC_TARGET) not in self.publisher.map
+
+    def test_republish_command_states_after_configure_missing(self) -> None:
+        self.vehicle_state.configure_missing()
+        self.publisher.map.clear()
+
+        self.vehicle_state.republish_command_states()
+
+        self.assert_mqtt_topic(
+            self.get_topic(mqtt_topics.REFRESH_PERIOD_ACTIVE), 30
+        )
+        self.assert_mqtt_topic(
+            self.get_topic(mqtt_topics.REFRESH_PERIOD_INACTIVE), 86400
+        )
+        self.assert_mqtt_topic(
+            self.get_topic(mqtt_topics.REFRESH_PERIOD_AFTER_SHUTDOWN), 120
+        )
+        self.assert_mqtt_topic(
+            self.get_topic(mqtt_topics.REFRESH_PERIOD_INACTIVE_GRACE), 600
+        )
+        self.assert_mqtt_topic(
+            self.get_topic(mqtt_topics.CLIMATE_REMOTE_TEMPERATURE), 22
+        )
+        self.assert_mqtt_topic(
+            self.get_topic(mqtt_topics.REFRESH_MODE), RefreshMode.PERIODIC.value
+        )
+
+    def test_republish_command_states_skips_unset_values(self) -> None:
+        self.vehicle_state.republish_command_states()
+
+        # Refresh periods are -1 and optional values are None, so they should not be published
+        assert self.get_topic(mqtt_topics.REFRESH_PERIOD_ACTIVE) not in self.publisher.map
+        assert self.get_topic(mqtt_topics.REFRESH_PERIOD_INACTIVE) not in self.publisher.map
+        assert self.get_topic(mqtt_topics.REFRESH_PERIOD_AFTER_SHUTDOWN) not in self.publisher.map
+        assert self.get_topic(mqtt_topics.REFRESH_PERIOD_INACTIVE_GRACE) not in self.publisher.map
+        assert self.get_topic(mqtt_topics.DRIVETRAIN_SOC_TARGET) not in self.publisher.map
+        assert self.get_topic(mqtt_topics.DRIVETRAIN_CHARGECURRENT_LIMIT) not in self.publisher.map
+        assert self.get_topic(mqtt_topics.CLIMATE_REMOTE_TEMPERATURE) not in self.publisher.map
+        # refresh_mode defaults to RefreshMode.OFF (never None), so it IS always published
+        self.assert_mqtt_topic(
+            self.get_topic(mqtt_topics.REFRESH_MODE), RefreshMode.OFF.value
+        )
+
+    def test_republish_command_states_includes_api_values(self) -> None:
+        self.vehicle_state.configure_missing()
+        self.vehicle_state.update_target_soc(TargetBatteryCode.P_80)
+        self.vehicle_state.update_charge_current_limit(ChargeCurrentLimitCode.C_MAX)
+        self.publisher.map.clear()
+
+        self.vehicle_state.republish_command_states()
+
+        self.assert_mqtt_topic(
+            self.get_topic(mqtt_topics.DRIVETRAIN_SOC_TARGET),
+            TargetBatteryCode.P_80.percentage,
+        )
+        self.assert_mqtt_topic(
+            self.get_topic(mqtt_topics.DRIVETRAIN_CHARGECURRENT_LIMIT),
+            ChargeCurrentLimitCode.C_MAX.limit,
+        )
 
     @staticmethod
     def get_topic(sub_topic: str) -> str:

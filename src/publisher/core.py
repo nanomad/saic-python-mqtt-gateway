@@ -30,6 +30,14 @@ class MqttCommandListener(ABC):
     ) -> None:
         raise NotImplementedError("Should have implemented this")
 
+    def on_mqtt_reconnected(self) -> None:  # noqa: B027
+        """Reset state when the MQTT client reconnects after a connection loss.
+
+        This is intentionally synchronous because it is called from gmqtt's
+        synchronous on_connect callback. It is also intentionally not abstract
+        so that implementations can opt in without being forced to override.
+        """
+
 
 class Publisher(ABC):
     def __init__(self, config: Configuration) -> None:
