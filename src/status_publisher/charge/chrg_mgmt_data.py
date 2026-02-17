@@ -87,7 +87,7 @@ class ChrgMgmtDataPublisher(
 
         raw_target_soc = charge_mgmt_data.bmsOnBdChrgTrgtSOCDspCmd
         target_soc: TargetBatteryCode | None = None
-        if raw_target_soc is not None:
+        if raw_target_soc is not None and raw_target_soc != 0:
             try:
                 target_soc = TargetBatteryCode(raw_target_soc)
             except ValueError:
@@ -179,6 +179,8 @@ class ChrgMgmtDataPublisher(
             and charge_mgmt_data.bmsReserStMintueDspCmd is not None
             and charge_mgmt_data.bmsReserSpHourDspCmd is not None
             and charge_mgmt_data.bmsReserSpMintueDspCmd is not None
+            and charge_mgmt_data.bmsReserCtrlDspCmd is not None
+            and charge_mgmt_data.bmsReserCtrlDspCmd != 0
         ):
             try:
                 start_hour = charge_mgmt_data.bmsReserStHourDspCmd

@@ -112,6 +112,18 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
         else:
             self.fail(f"MQTT map does not contain topic {topic}")
 
+    def test_handle_charge_status_with_phev_ignore_values(self) -> None:
+        """PHEV vehicles send P_IGNORE (0) for target SOC and 0 for scheduled charging mode."""
+        chrg_mgmt_data_resp = get_mock_charge_management_data_resp(
+            bms_on_bd_chrg_trgt_soc_dsp_cmd=0,
+            bms_reser_ctrl_dsp_cmd=0,
+        )
+        result = self.vehicle_state.handle_charge_status(chrg_mgmt_data_resp)
+
+        assert result.target_soc is None
+        assert result.scheduled_charging is None
+        assert self.get_topic(mqtt_topics.DRIVETRAIN_SOC_TARGET) not in self.publisher.map
+
     @staticmethod
     def get_topic(sub_topic: str) -> str:
         return f"/vehicles/{VIN}/{sub_topic}"
