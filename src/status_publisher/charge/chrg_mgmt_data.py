@@ -8,7 +8,9 @@ from typing import override
 
 from saic_ismart_client_ng.api.vehicle_charging import (
     ChargeCurrentLimitCode,
+    ChargingStopReason,
     ChrgMgmtData,
+    HeatingStopReason,
     ScheduledChargingMode,
     TargetBatteryCode,
 )
@@ -110,6 +112,7 @@ class ChrgMgmtDataPublisher(
         self._transform_and_publish(
             topic=mqtt_topics.DRIVETRAIN_CHARGING_STOP_REASON,
             value=charge_mgmt_data.charging_stop_reason,
+            validator=lambda x: x != ChargingStopReason.NO_REASON,
             transform=lambda x: f"UNKNOWN {charge_mgmt_data.bmsChrgSpRsn}"
             if x is None
             else x.name,
@@ -149,6 +152,7 @@ class ChrgMgmtDataPublisher(
         self._transform_and_publish(
             topic=mqtt_topics.DRIVETRAIN_BATTERY_HEATING_STOP_REASON,
             value=charge_mgmt_data.heating_stop_reason,
+            validator=lambda x: x != HeatingStopReason.NO_REASON,
             transform=lambda x: f"UNKNOWN ({charge_mgmt_data.bmsPTCHeatResp})"
             if x is None
             else x.name,
