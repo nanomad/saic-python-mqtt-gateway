@@ -451,6 +451,58 @@ class VehicleState:
                 f"initial gateway startup from an invalid state {self.refresh_mode}",
             )
 
+    def republish_command_states(self) -> None:
+        """Unconditionally publish all command entity values to MQTT.
+
+        This bypasses change detection so that retained messages are restored
+        after a broker or Home Assistant restart.
+        """
+        if self.refresh_period_active != -1:
+            self.publisher.publish_int(
+                self.get_topic(mqtt_topics.REFRESH_PERIOD_ACTIVE),
+                self.refresh_period_active,
+            )
+        if self.refresh_period_inactive != -1:
+            self.publisher.publish_int(
+                self.get_topic(mqtt_topics.REFRESH_PERIOD_INACTIVE),
+                self.refresh_period_inactive,
+            )
+        if self.refresh_period_after_shutdown != -1:
+            self.publisher.publish_int(
+                self.get_topic(mqtt_topics.REFRESH_PERIOD_AFTER_SHUTDOWN),
+                self.refresh_period_after_shutdown,
+            )
+        if self.refresh_period_inactive_grace != -1:
+            self.publisher.publish_int(
+                self.get_topic(mqtt_topics.REFRESH_PERIOD_INACTIVE_GRACE),
+                self.refresh_period_inactive_grace,
+            )
+        if self.refresh_period_charging > 0:
+            self.publisher.publish_int(
+                self.get_topic(mqtt_topics.REFRESH_PERIOD_CHARGING),
+                self.refresh_period_charging,
+            )
+        if self.refresh_mode is not None:
+            self.publisher.publish_str(
+                self.get_topic(mqtt_topics.REFRESH_MODE),
+                self.refresh_mode.value,
+            )
+        if self.__remote_ac_temp is not None:
+            self.publisher.publish_int(
+                self.get_topic(mqtt_topics.CLIMATE_REMOTE_TEMPERATURE),
+                self.__remote_ac_temp,
+            )
+        if self.target_soc is not None:
+            self.publisher.publish_int(
+                self.get_topic(mqtt_topics.DRIVETRAIN_SOC_TARGET),
+                self.target_soc.percentage,
+            )
+        if self.charge_current_limit is not None:
+            self.publisher.publish_str(
+                self.get_topic(mqtt_topics.DRIVETRAIN_CHARGECURRENT_LIMIT),
+                self.charge_current_limit.limit,
+            )
+
     def handle_charge_status(
         self, charge_info_resp: ChrgMgmtDataResp
     ) -> ChrgMgmtDataRespProcessingResult:
