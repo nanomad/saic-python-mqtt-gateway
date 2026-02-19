@@ -98,19 +98,21 @@ class HomeAssistantDiscovery(HomeAssistantDiscoveryBase):
         self.__publish_doors_sensors()
         self.__publish_drivetrain_charging_sensors()
 
-        # Target SoC
-        self._publish_number(
-            mqtt_topics.DRIVETRAIN_SOC_TARGET,
-            "Target SoC",
-            enabled=self.__vin_info.supports_target_soc,
-            device_class="battery",
-            unit_of_measurement="%",
-            icon="mdi:battery-charging-70",
-            mode="slider",
-            min_value=40,
-            max_value=100,
-            step=10,
-        )
+        # Target SoC — only offer the entity if the vehicle actually supports it
+        if self.__vin_info.supports_target_soc:
+            self._publish_number(
+                mqtt_topics.DRIVETRAIN_SOC_TARGET,
+                "Target SoC",
+                device_class="battery",
+                unit_of_measurement="%",
+                icon="mdi:battery-charging-70",
+                mode="slider",
+                min_value=40,
+                max_value=100,
+                step=10,
+            )
+        else:
+            self.__unpublish_ha_discovery_message("number", "Target SoC")
         options = [
             m.limit
             for m in ChargeCurrentLimitCode
@@ -934,7 +936,12 @@ class HomeAssistantDiscovery(HomeAssistantDiscoveryBase):
                 "mode": "{{ value }}",
             }
         )
-        options = [m.name for m in ScheduledChargingMode]
+        options = [
+            m.name
+            for m in ScheduledChargingMode
+            if m != ScheduledChargingMode.UNTIL_CONFIGURED_SOC
+            or self.__vin_info.supports_target_soc
+        ]
         self._publish_select(
             mqtt_topics.DRIVETRAIN_CHARGING_SCHEDULE,
             "Scheduled Charging Mode",

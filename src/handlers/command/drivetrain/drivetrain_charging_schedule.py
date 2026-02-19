@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, override
 from saic_ismart_client_ng.api.vehicle_charging import ScheduledChargingMode
 
 from handlers.command.base import (
+    RESULT_DO_NOTHING,
     RESULT_REFRESH_ONLY,
     CommandProcessingResult,
     PayloadConvertingCommandHandler,
@@ -54,6 +55,15 @@ class DrivetrainChargingScheduleCommand(
     async def handle_typed_payload(
         self, payload: ChargingScheduleCommandPayload
     ) -> CommandProcessingResult:
+        if (
+            payload.mode == ScheduledChargingMode.UNTIL_CONFIGURED_SOC
+            and not self.vehicle_state.vehicle.supports_target_soc
+        ):
+            LOG.warning(
+                "Ignoring UNTIL_CONFIGURED_SOC charging schedule: "
+                "vehicle does not support target SoC"
+            )
+            return RESULT_DO_NOTHING
         LOG.info("Setting charging schedule to %s", str(payload))
         await self.saic_api.set_schedule_charging(
             self.vin,
