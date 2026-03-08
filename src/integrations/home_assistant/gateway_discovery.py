@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from importlib.metadata import version
 import logging
 import re
 from typing import TYPE_CHECKING, Any, override
@@ -47,6 +48,13 @@ class HomeAssistantGatewayDiscovery(HomeAssistantDiscoveryBase):
         self.published = False
 
     def __publish_gateway_sensors(self) -> None:
+        self._publish_sensor(
+            mqtt_topics.ACCOUNT_GATEWAY_VERSION,
+            "Gateway version",
+            entity_category="diagnostic",
+            icon="mdi:tag",
+            custom_availability=self.__system_availability_config,
+        )
         self._publish_sensor(
             mqtt_topics.ACCOUNT_USER_TIMEZONE,
             "Account timezone",
@@ -108,6 +116,7 @@ class HomeAssistantGatewayDiscovery(HomeAssistantDiscoveryBase):
             "name": "SAIC Python MQTT Gateway",
             "manufacturer": "SAIC",
             "model": "Python MQTT Gateway",
+            "sw_version": version("saic-python-mqtt-gateway"),
             "identifiers": [self.__gateway_id],
         }
 
