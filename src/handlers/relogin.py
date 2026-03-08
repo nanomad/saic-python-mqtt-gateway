@@ -5,6 +5,8 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from apscheduler.schedulers.base import BaseScheduler
     from saic_ismart_client_ng import SaicApi
 
@@ -20,10 +22,14 @@ class ReloginHandler:
         self.__scheduler = scheduler
         self.__api = api
         self.__login_task = None
+        self.__post_login_callbacks: list[Callable[[], Awaitable[None]]] = []
 
     @property
     def relogin_in_progress(self) -> bool:
         return self.__login_task is not None
+
+    def add_post_login_callback(self, callback: Callable[[], Awaitable[None]]) -> None:
+        self.__post_login_callbacks.append(callback)
 
     def relogin(self) -> None:
         if self.__login_task is None:
@@ -44,10 +50,18 @@ class ReloginHandler:
             LOG.info("Logging in to SAIC API")
             login_response_message = await self.__api.login()
             LOG.info("Logged in as %s", login_response_message.account)
+            await self.__run_post_login_callbacks()
         except Exception as e:
             LOG.exception("Could not login to the SAIC API due to an error", exc_info=e)
-            raise e
+            raise
         finally:
             if self.__scheduler.get_job(JOB_ID) is not None:
                 self.__scheduler.remove_job(JOB_ID)
             self.__login_task = None
+
+    async def __run_post_login_callbacks(self) -> None:
+        for callback in self.__post_login_callbacks:
+            try:
+                await callback()
+            except Exception:
+                LOG.warning("Post-login callback failed", exc_info=True)
