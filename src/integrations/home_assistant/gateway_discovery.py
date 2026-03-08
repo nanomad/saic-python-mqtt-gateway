@@ -8,7 +8,11 @@ from integrations.home_assistant.availability import (
     HaCustomAvailabilityConfig,
     HaCustomAvailabilityEntry,
 )
-from integrations.home_assistant.base import HomeAssistantDiscoveryBase
+from integrations.home_assistant.base import (
+    _GATEWAY_VERSION,
+    _ORIGIN,
+    HomeAssistantDiscoveryBase,
+)
 from integrations.home_assistant.utils import snake_case
 import mqtt_topics
 from publisher.mqtt_publisher import MqttPublisher
@@ -47,6 +51,13 @@ class HomeAssistantGatewayDiscovery(HomeAssistantDiscoveryBase):
         self.published = False
 
     def __publish_gateway_sensors(self) -> None:
+        self._publish_sensor(
+            mqtt_topics.ACCOUNT_GATEWAY_VERSION,
+            "Gateway version",
+            entity_category="diagnostic",
+            icon="mdi:tag",
+            custom_availability=self.__system_availability_config,
+        )
         self._publish_sensor(
             mqtt_topics.ACCOUNT_USER_TIMEZONE,
             "Account timezone",
@@ -108,6 +119,7 @@ class HomeAssistantGatewayDiscovery(HomeAssistantDiscoveryBase):
             "name": "SAIC Python MQTT Gateway",
             "manufacturer": "SAIC",
             "model": "Python MQTT Gateway",
+            "sw_version": _GATEWAY_VERSION,
             "identifiers": [self.__gateway_id],
         }
 
@@ -121,6 +133,7 @@ class HomeAssistantGatewayDiscovery(HomeAssistantDiscoveryBase):
         common_attributes = {
             "name": name,
             "device": self.__get_device_node(),
+            "o": _ORIGIN,
             "unique_id": unique_id,
             "object_id": unique_id,
             "default_entity_id": f"{domain}.{unique_id}",

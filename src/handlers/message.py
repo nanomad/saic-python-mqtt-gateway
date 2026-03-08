@@ -74,7 +74,10 @@ class MessageHandler:
             for vehicle_start_message in vehicle_start_messages:
                 await self.__delete_message(vehicle_start_message)
         except SaicLogoutException as e:
-            LOG.error("API Client was logged out, waiting for a new login", exc_info=e)
+            LOG.warning(
+                "API Client was logged out, scheduling delayed relogin",
+                exc_info=e,
+            )
             self.relogin_handler.relogin()
         except SaicApiException as e:
             LOG.exception(

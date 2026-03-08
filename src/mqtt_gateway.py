@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from asyncio import Task
 import datetime
+from importlib.metadata import version
 import logging
 from random import uniform
 import re
@@ -202,6 +203,10 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
     async def __refresh_account_data(self) -> None:
         await self.__refresh_vehicle_list()
         await self.__refresh_user_timezone()
+        self.__publish_account_str(
+            mqtt_topics.ACCOUNT_GATEWAY_VERSION,
+            version("saic-python-mqtt-gateway"),
+        )
         self.__publish_account_int(
             mqtt_topics.ACCOUNT_REFRESH_INTERVAL,
             self.configuration.account_refresh_interval,

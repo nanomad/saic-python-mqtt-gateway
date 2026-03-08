@@ -92,10 +92,35 @@ class VehicleCommandHandler:
         except MqttGatewayException as e:
             self.publisher.publish_str(result_topic, f"Failed: {e.message}")
             LOG.exception(e.message, exc_info=e)
-        except SaicLogoutException as se:
-            self.publisher.publish_str(result_topic, f"Failed: {se.message}")
-            LOG.error("API Client was logged out, waiting for a new login", exc_info=se)
-            self.relogin_handler.relogin()
+        except SaicLogoutException:
+            LOG.warning(
+                "API Client was logged out, attempting immediate relogin and retry"
+            )
+            try:
+                await self.relogin_handler.force_login()
+            except Exception as login_err:
+                self.publisher.publish_str(
+                    result_topic, f"Failed: relogin failed ({login_err})"
+                )
+                LOG.error("Immediate relogin failed", exc_info=login_err)
+                return
+            try:
+                execution_result = await handler.handle(payload)
+                self.publisher.publish_str(result_topic, "Success")
+                if execution_result.force_refresh:
+                    self.vehicle_state.set_refresh_mode(
+                        RefreshMode.FORCE,
+                        f"after command execution on topic {topic}",
+                    )
+                if execution_result.clear_command:
+                    self.publisher.clear_topic(topic_no_global)
+            except Exception as retry_err:
+                self.publisher.publish_str(
+                    result_topic, f"Failed: {retry_err}"
+                )
+                LOG.error(
+                    "Command retry after relogin failed", exc_info=retry_err
+                )
         except SaicApiException as se:
             self.publisher.publish_str(result_topic, f"Failed: {se.message}")
             LOG.exception(se.message, exc_info=se)

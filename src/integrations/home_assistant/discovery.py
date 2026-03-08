@@ -13,7 +13,7 @@ from integrations.home_assistant.availability import (
     HaCustomAvailabilityConfig,
     HaCustomAvailabilityEntry,
 )
-from integrations.home_assistant.base import HomeAssistantDiscoveryBase
+from integrations.home_assistant.base import _ORIGIN, HomeAssistantDiscoveryBase
 from integrations.home_assistant.utils import decode_as_utf8, snake_case
 import mqtt_topics
 from publisher.mqtt_publisher import MqttPublisher
@@ -818,6 +818,7 @@ class HomeAssistantDiscovery(HomeAssistantDiscoveryBase):
         common_attributes = {
             "name": name,
             "device": self.__get_device_node(),
+            "o": _ORIGIN,
             "unique_id": unique_id,
             "object_id": unique_id,
             "default_entity_id": f"{domain}.{unique_id}",
