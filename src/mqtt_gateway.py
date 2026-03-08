@@ -361,7 +361,7 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
 
     @override
     def on_mqtt_reconnected(self) -> None:
-        LOG.info("MQTT reconnected, resetting HA discovery")
+        LOG.info("MQTT reconnected, resetting HA discovery for all vehicles")
         if self.__gateway_discovery is not None:
             self.__gateway_discovery.reset()
         for vin, vh in self.vehicle_handlers.items():
