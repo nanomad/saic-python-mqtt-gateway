@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta
 import logging
 from typing import TYPE_CHECKING
@@ -23,12 +24,14 @@ class ReloginHandler:
         self.__scheduler = scheduler
         self.__api = api
         self.__login_task: Job | None = None
+        self.__login_in_progress = False
+        self.__login_lock = asyncio.Lock()
         self.__post_login_callbacks: list[Callable[[], Awaitable[None]]] = []
         self.__login_failure_callbacks: list[Callable[[], Awaitable[None]]] = []
 
     @property
     def relogin_in_progress(self) -> bool:
-        return self.__login_task is not None
+        return self.__login_task is not None or self.__login_in_progress
 
     def add_post_login_callback(self, callback: Callable[[], Awaitable[None]]) -> None:
         self.__post_login_callbacks.append(callback)
@@ -39,7 +42,7 @@ class ReloginHandler:
         self.__login_failure_callbacks.append(callback)
 
     def relogin(self) -> None:
-        if self.__login_task is None:
+        if self.__login_task is None and not self.__login_in_progress:
             LOG.warning(
                 f"API Client got logged out, logging back in {self.__relogin_relay} seconds"
             )
@@ -62,19 +65,24 @@ class ReloginHandler:
         await self.login()
 
     async def login(self) -> None:
-        try:
-            LOG.info("Logging in to SAIC API")
-            login_response_message = await self.__api.login()
-            LOG.info("Logged in as %s", login_response_message.account)
-            await self.__run_post_login_callbacks()
-        except Exception as e:
-            LOG.exception("Could not login to the SAIC API due to an error", exc_info=e)
-            await self.__run_login_failure_callbacks()
-            raise
-        finally:
-            if self.__scheduler.get_job(JOB_ID) is not None:
-                self.__scheduler.remove_job(JOB_ID)
-            self.__login_task = None
+        async with self.__login_lock:
+            self.__login_in_progress = True
+            try:
+                LOG.info("Logging in to SAIC API")
+                login_response_message = await self.__api.login()
+                LOG.info("Logged in as %s", login_response_message.account)
+                await self.__run_post_login_callbacks()
+            except Exception as e:
+                LOG.exception(
+                    "Could not login to the SAIC API due to an error", exc_info=e
+                )
+                await self.__run_login_failure_callbacks()
+                raise
+            finally:
+                if self.__scheduler.get_job(JOB_ID) is not None:
+                    self.__scheduler.remove_job(JOB_ID)
+                self.__login_task = None
+                self.__login_in_progress = False
 
     async def __run_post_login_callbacks(self) -> None:
         for callback in self.__post_login_callbacks:

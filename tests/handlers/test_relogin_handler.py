@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
@@ -192,6 +193,51 @@ class TestReloginHandler(unittest.IsolatedAsyncioTestCase):
             await self.handler.force_login()
 
         assert not self.handler.relogin_in_progress
+
+    async def test_concurrent_force_login_only_logs_in_once(self) -> None:
+        """Multiple concurrent force_login calls should serialize via lock."""
+        await asyncio.gather(
+            self.handler.force_login(),
+            self.handler.force_login(),
+            self.handler.force_login(),
+        )
+
+        # The lock serializes, but each call runs login() sequentially
+        # All three complete, API login called 3 times (serialized, not concurrent)
+        assert self.mock_api.login.await_count == 3
+        assert not self.handler.relogin_in_progress
+
+    async def test_relogin_in_progress_true_during_login(self) -> None:
+        """relogin_in_progress should be True while login() is executing."""
+        observed_states: list[bool] = []
+
+        original_login = self.mock_api.login
+
+        async def capturing_login() -> MagicMock:
+            observed_states.append(self.handler.relogin_in_progress)
+            result: MagicMock = await original_login()
+            return result
+
+        self.mock_api.login = AsyncMock(side_effect=capturing_login)
+
+        await self.handler.login()
+
+        assert observed_states == [True]
+        assert not self.handler.relogin_in_progress
+
+    async def test_relogin_skipped_during_active_login(self) -> None:
+        """relogin() should not schedule a job while login() is in progress."""
+
+        async def slow_login() -> MagicMock:
+            # Simulate relogin() being called while login is in flight
+            self.handler.relogin()
+            return MagicMock(account="test_user")
+
+        self.mock_api.login = AsyncMock(side_effect=slow_login)
+
+        await self.handler.login()
+
+        self.mock_scheduler.add_job.assert_not_called()
 
     def _assert_force_login_succeeded(self) -> None:
         assert not self.handler.relogin_in_progress

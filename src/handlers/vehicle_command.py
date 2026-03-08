@@ -98,6 +98,13 @@ class VehicleCommandHandler:
             )
             try:
                 await self.relogin_handler.force_login()
+            except Exception as login_err:
+                self.publisher.publish_str(
+                    result_topic, f"Failed: relogin failed ({login_err})"
+                )
+                LOG.error("Immediate relogin failed", exc_info=login_err)
+                return
+            try:
                 execution_result = await handler.handle(payload)
                 self.publisher.publish_str(result_topic, "Success")
                 if execution_result.force_refresh:

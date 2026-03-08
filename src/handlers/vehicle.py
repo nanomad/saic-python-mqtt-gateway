@@ -17,6 +17,7 @@ from integrations.osmand.api import OsmAndApi
 import mqtt_topics
 from saic_api_listener import MqttGatewayAbrpListener, MqttGatewayOsmAndListener
 from status_publisher.vehicle_info import VehicleInfoPublisher
+from vehicle import RefreshMode
 
 if TYPE_CHECKING:
     from saic_ismart_client_ng import SaicApi
@@ -138,14 +139,24 @@ class VehicleHandler:
                     await self.__polling()
                 except SaicLogoutException as e:
                     self.vehicle_state.mark_failed_refresh()
-                    LOG.warning(
-                        "API Client was logged out, attempting immediate relogin",
-                        exc_info=e,
-                    )
-                    try:
-                        await self.relogin_handler.force_login()
-                    except Exception:
-                        LOG.warning("Immediate relogin failed, scheduling delayed relogin")
+                    if self.vehicle_state.refresh_mode == RefreshMode.FORCE:
+                        LOG.warning(
+                            "API Client was logged out during forced refresh,"
+                            " attempting immediate relogin",
+                            exc_info=e,
+                        )
+                        try:
+                            await self.relogin_handler.force_login()
+                        except Exception:
+                            LOG.warning(
+                                "Immediate relogin failed, scheduling delayed relogin"
+                            )
+                            self.relogin_handler.relogin()
+                    else:
+                        LOG.warning(
+                            "API Client was logged out, scheduling delayed relogin",
+                            exc_info=e,
+                        )
                         self.relogin_handler.relogin()
                 except SaicApiException as e:
                     self.vehicle_state.mark_failed_refresh()
