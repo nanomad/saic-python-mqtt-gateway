@@ -888,7 +888,9 @@ class HomeAssistantDiscovery(HomeAssistantDiscoveryBase):
         vin = self.vin
         unique_id = f"{vin}_{snake_case(sensor_name)}"
         final_payload = (
-            self.__get_common_attributes(unique_id, sensor_type, sensor_name, custom_availability)
+            self.__get_common_attributes(
+                unique_id, sensor_type, sensor_name, custom_availability
+            )
             | payload
         )
         ha_topic = (

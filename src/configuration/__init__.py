@@ -41,6 +41,7 @@ class Configuration:
         self.charging_stations_by_vin: dict[str, ChargingStation] = {}
         self.anonymized_publishing: bool = False
         self.messages_request_interval: int = 60  # in seconds
+        self.account_refresh_interval: int = 24 * 60 * 60  # in seconds
         self.ha_discovery_enabled: bool = True
         self.ha_discovery_prefix: str = "homeassistant"
         self.ha_show_unavailable: bool = True

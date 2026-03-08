@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import datetime
+import json
 from typing import Any
 import unittest
+from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 import pytest
@@ -9,6 +12,9 @@ from saic_ismart_client_ng.api.vehicle.schema import VinInfo
 from saic_ismart_client_ng.api.vehicle_charging import (
     ChargeCurrentLimitCode,
     TargetBatteryCode,
+)
+from saic_ismart_client_ng.api.vehicle_charging.schema import (
+    ScheduledBatteryHeatingResp,
 )
 
 from configuration import Configuration
@@ -126,7 +132,9 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
 
         assert result.target_soc is None
         assert result.scheduled_charging is None
-        assert self.get_topic(mqtt_topics.DRIVETRAIN_SOC_TARGET) not in self.publisher.map
+        assert (
+            self.get_topic(mqtt_topics.DRIVETRAIN_SOC_TARGET) not in self.publisher.map
+        )
 
     def test_republish_command_states_after_configure_missing(self) -> None:
         self.vehicle_state.configure_missing()
@@ -134,9 +142,7 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
 
         self.vehicle_state.republish_command_states()
 
-        self.assert_mqtt_topic(
-            self.get_topic(mqtt_topics.REFRESH_PERIOD_ACTIVE), 30
-        )
+        self.assert_mqtt_topic(self.get_topic(mqtt_topics.REFRESH_PERIOD_ACTIVE), 30)
         self.assert_mqtt_topic(
             self.get_topic(mqtt_topics.REFRESH_PERIOD_INACTIVE), 86400
         )
@@ -157,13 +163,32 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
         self.vehicle_state.republish_command_states()
 
         # Refresh periods are -1 and optional values are None, so they should not be published
-        assert self.get_topic(mqtt_topics.REFRESH_PERIOD_ACTIVE) not in self.publisher.map
-        assert self.get_topic(mqtt_topics.REFRESH_PERIOD_INACTIVE) not in self.publisher.map
-        assert self.get_topic(mqtt_topics.REFRESH_PERIOD_AFTER_SHUTDOWN) not in self.publisher.map
-        assert self.get_topic(mqtt_topics.REFRESH_PERIOD_INACTIVE_GRACE) not in self.publisher.map
-        assert self.get_topic(mqtt_topics.DRIVETRAIN_SOC_TARGET) not in self.publisher.map
-        assert self.get_topic(mqtt_topics.DRIVETRAIN_CHARGECURRENT_LIMIT) not in self.publisher.map
-        assert self.get_topic(mqtt_topics.CLIMATE_REMOTE_TEMPERATURE) not in self.publisher.map
+        assert (
+            self.get_topic(mqtt_topics.REFRESH_PERIOD_ACTIVE) not in self.publisher.map
+        )
+        assert (
+            self.get_topic(mqtt_topics.REFRESH_PERIOD_INACTIVE)
+            not in self.publisher.map
+        )
+        assert (
+            self.get_topic(mqtt_topics.REFRESH_PERIOD_AFTER_SHUTDOWN)
+            not in self.publisher.map
+        )
+        assert (
+            self.get_topic(mqtt_topics.REFRESH_PERIOD_INACTIVE_GRACE)
+            not in self.publisher.map
+        )
+        assert (
+            self.get_topic(mqtt_topics.DRIVETRAIN_SOC_TARGET) not in self.publisher.map
+        )
+        assert (
+            self.get_topic(mqtt_topics.DRIVETRAIN_CHARGECURRENT_LIMIT)
+            not in self.publisher.map
+        )
+        assert (
+            self.get_topic(mqtt_topics.CLIMATE_REMOTE_TEMPERATURE)
+            not in self.publisher.map
+        )
         # refresh_mode defaults to RefreshMode.OFF (never None), so it IS always published
         self.assert_mqtt_topic(
             self.get_topic(mqtt_topics.REFRESH_MODE), RefreshMode.OFF.value
@@ -185,6 +210,51 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
             self.get_topic(mqtt_topics.DRIVETRAIN_CHARGECURRENT_LIMIT),
             ChargeCurrentLimitCode.C_MAX.limit,
         )
+
+    def test_battery_heating_decodes_with_user_timezone(self) -> None:
+        """Battery heating time 15:30 CET stored as UTC epoch is decoded back to 15:30."""
+        cet = ZoneInfo("Europe/Rome")
+        self.vehicle_state.update_user_timezone(cet)
+
+        # Create a UTC epoch for 15:30 CET today
+        today = datetime.date.today()
+        local_dt = datetime.datetime(
+            today.year, today.month, today.day, 15, 30, tzinfo=cet
+        )
+        epoch_ms = int(local_dt.timestamp()) * 1000
+
+        resp = ScheduledBatteryHeatingResp()
+        resp.startTime = epoch_ms
+        resp.status = 1
+
+        self.vehicle_state.handle_scheduled_battery_heating_status(resp)
+
+        topic = self.get_topic(mqtt_topics.DRIVETRAIN_BATTERY_HEATING_SCHEDULE)
+        result = json.loads(self.publisher.map[topic])
+        assert result["startTime"] == "15:30"
+        assert result["mode"] == "on"
+
+    def test_battery_heating_decodes_utc_timestamp_with_user_timezone(self) -> None:
+        """08:00 CET (07:00 UTC) stored as epoch → decoded as 08:00."""
+        cet = ZoneInfo("Europe/Rome")
+        self.vehicle_state.update_user_timezone(cet)
+
+        today = datetime.date.today()
+        local_dt = datetime.datetime(
+            today.year, today.month, today.day, 8, 0, tzinfo=cet
+        )
+        epoch_ms = int(local_dt.timestamp()) * 1000
+
+        resp = ScheduledBatteryHeatingResp()
+        resp.startTime = epoch_ms
+        resp.status = 1
+
+        self.vehicle_state.handle_scheduled_battery_heating_status(resp)
+
+        topic = self.get_topic(mqtt_topics.DRIVETRAIN_BATTERY_HEATING_SCHEDULE)
+        result = json.loads(self.publisher.map[topic])
+        assert result["startTime"] == "08:00"
+        assert result["mode"] == "on"
 
     @staticmethod
     def get_topic(sub_topic: str) -> str:
