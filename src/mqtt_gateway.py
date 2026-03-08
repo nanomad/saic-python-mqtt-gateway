@@ -5,6 +5,7 @@ from asyncio import Task
 import logging
 from random import uniform
 from typing import TYPE_CHECKING, Any, override
+from zoneinfo import ZoneInfo
 
 import apscheduler.schedulers.asyncio
 from saic_ismart_client_ng import SaicApi
@@ -81,6 +82,8 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
         message_request_interval = self.configuration.messages_request_interval
         await self.__do_initial_login(message_request_interval)
 
+        self.__user_timezone = await self.__fetch_user_timezone()
+
         LOG.info("Fetching vehicle list")
         vin_list = await self.saic_api.vehicle_list()
 
@@ -88,6 +91,9 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
 
         for vin_info in vin_list.vinList:
             await self.setup_vehicle(alarm_switches, vin_info)
+
+        self.__publish_user_timezone()
+        self.__relogin_handler.add_post_login_callback(self.__refresh_user_timezone)
 
         message_handler = MessageHandler(
             gateway=self, relogin_handler=self.__relogin_handler, saicapi=self.saic_api
@@ -111,6 +117,36 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
 
         LOG.info("Entering main loop")
         await self.__main_loop()
+
+    async def __fetch_user_timezone(self) -> ZoneInfo | None:
+        try:
+            resp = await self.saic_api.get_user_timezone()
+            if resp.timezone:
+                tz = ZoneInfo(resp.timezone)
+                LOG.info("User timezone from API: %s", resp.timezone)
+                return tz
+            LOG.warning("API returned no timezone, using system default")
+        except Exception:
+            LOG.warning(
+                "Failed to fetch user timezone, using system default", exc_info=True
+            )
+        return None
+
+    def __publish_user_timezone(self) -> None:
+        tz_str = (
+            str(self.__user_timezone) if self.__user_timezone is not None else "unknown"
+        )
+        for vh in self.vehicle_handlers.values():
+            vh.vehicle_state.publisher.publish_str(
+                vh.vehicle_state.get_topic(mqtt_topics.ACCOUNT_USER_TIMEZONE),
+                tz_str,
+            )
+
+    async def __refresh_user_timezone(self) -> None:
+        tz = await self.__fetch_user_timezone()
+        if tz is not None:
+            self.__user_timezone = tz
+        self.__publish_user_timezone()
 
     async def __do_initial_login(self, message_request_interval: int) -> None:
         while True:

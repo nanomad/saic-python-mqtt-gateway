@@ -700,6 +700,13 @@ class HomeAssistantDiscovery(HomeAssistantDiscoveryBase):
             entity_category="diagnostic",
             custom_availability=self.__system_availability_config,
         )
+        self._publish_sensor(
+            mqtt_topics.ACCOUNT_USER_TIMEZONE,
+            "Account timezone",
+            entity_category="diagnostic",
+            icon="mdi:map-clock",
+            custom_availability=self.__system_availability_config,
+        )
 
     def __publish_climate_sensors(self) -> None:
         self.__publish_remote_ac()
@@ -888,7 +895,9 @@ class HomeAssistantDiscovery(HomeAssistantDiscoveryBase):
         vin = self.vin
         unique_id = f"{vin}_{snake_case(sensor_name)}"
         final_payload = (
-            self.__get_common_attributes(unique_id, sensor_type, sensor_name, custom_availability)
+            self.__get_common_attributes(
+                unique_id, sensor_type, sensor_name, custom_availability
+            )
             | payload
         )
         ha_topic = (
