@@ -2,10 +2,21 @@ from __future__ import annotations
 
 import abc
 from abc import abstractmethod
+from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from integrations.home_assistant.availability import HaCustomAvailabilityConfig
+
+try:
+    _GATEWAY_VERSION = version("saic-python-mqtt-gateway")
+except PackageNotFoundError:
+    _GATEWAY_VERSION = "unknown"
+_ORIGIN = {
+    "name": "SAIC Python MQTT Gateway",
+    "sw": _GATEWAY_VERSION,
+    "url": "https://github.com/SAIC-iSmart/saic-python-mqtt-gateway",
+}
 
 
 class HomeAssistantDiscoveryBase(metaclass=abc.ABCMeta):
