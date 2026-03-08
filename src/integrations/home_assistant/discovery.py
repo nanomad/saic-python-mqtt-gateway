@@ -820,7 +820,6 @@ class HomeAssistantDiscovery(HomeAssistantDiscoveryBase):
             "device": self.__get_device_node(),
             "o": _ORIGIN,
             "unique_id": unique_id,
-            "object_id": unique_id,
             "default_entity_id": f"{domain}.{unique_id}",
         }
 
