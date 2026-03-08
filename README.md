@@ -40,6 +40,7 @@ When using combinations of configuration methods, the order of precedence is as 
 | --messages-request-interval | MESSAGES_REQUEST_INTERVAL    | The interval for retrieving messages in seconds. Default is 60 seconds.                                                                                                             |
 | --battery-capacity-mapping  | BATTERY_CAPACITY_MAPPING     | Mapping of VIN to full battery capacity. Multiple mappings can be provided separated by ',' Example: LSJXXXX=54.0,LSJYYYY=64.0                                                      |
 | --charge-min-percentage     | CHARGE_MIN_PERCENTAGE        | How many % points we should try to refresh the charge state. 1.0 by default                                                                                                         |
+| --account-refresh-interval  | ACCOUNT_REFRESH_INTERVAL     | Interval in seconds for refreshing account-level data (vehicle list, timezone). Default is 86400 (24 hours).                                                                        |
 | --publish-raw-api-data      | PUBLISH_RAW_API_DATA_ENABLED | Publish raw SAIC API request/response to MQTT. Disabled (False) by default.                                                                                                         |
 
 #### API Endpoints
@@ -206,5 +207,23 @@ with the default vehicle prefix: `saic/<saic_user>/vehicles/<vehicle_id>`
 ## Home Assistant auto-discovery
 
 The gateway supports [Home Assistant MQTT discovery](https://www.home-assistant.io/integrations/mqtt#mqtt-discovery). It
-publishes configuration information so that the vehicle appears as a MQTT device. This will save you a lot of
-configuration effort since all the entities provided by the vehicle will automatically show-up in Home Assistant.
+publishes configuration information so that vehicles and the gateway itself appear as MQTT devices. This will save you a
+lot of configuration effort since all the entities will automatically show up in Home Assistant.
+
+### Gateway device
+
+A dedicated **SAIC Python MQTT Gateway** device is created in Home Assistant with account-level diagnostic sensors:
+
+| Entity                       | Description                                               |
+|------------------------------|-----------------------------------------------------------|
+| Account timezone             | User timezone fetched from the SAIC API                   |
+| Account refresh interval     | How often account-level data is refreshed (seconds)       |
+| Account last refresh         | Timestamp of the last successful account data refresh     |
+| Account last login           | Timestamp of the last successful login to the SAIC API    |
+| Account last login error     | Timestamp of the last failed login attempt                |
+
+This device provides visibility into the gateway's status even when no vehicles are available.
+
+### Vehicle devices
+
+Each vehicle registered to your account appears as a separate device with sensors for drivetrain, climate, location, and more.
