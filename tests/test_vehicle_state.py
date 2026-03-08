@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import datetime
+import json
 from typing import Any
 import unittest
+from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 import pytest
@@ -9,6 +12,9 @@ from saic_ismart_client_ng.api.vehicle.schema import VinInfo
 from saic_ismart_client_ng.api.vehicle_charging import (
     ChargeCurrentLimitCode,
     TargetBatteryCode,
+)
+from saic_ismart_client_ng.api.vehicle_charging.schema import (
+    ScheduledBatteryHeatingResp,
 )
 
 from configuration import Configuration
@@ -204,6 +210,51 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
             self.get_topic(mqtt_topics.DRIVETRAIN_CHARGECURRENT_LIMIT),
             ChargeCurrentLimitCode.C_MAX.limit,
         )
+
+    def test_battery_heating_decodes_with_user_timezone(self) -> None:
+        """Battery heating time 15:30 CET stored as UTC epoch is decoded back to 15:30."""
+        cet = ZoneInfo("Europe/Rome")
+        self.vehicle_state.update_user_timezone(cet)
+
+        # Create a UTC epoch for 15:30 CET today
+        today = datetime.date.today()
+        local_dt = datetime.datetime(
+            today.year, today.month, today.day, 15, 30, tzinfo=cet
+        )
+        epoch_ms = int(local_dt.timestamp()) * 1000
+
+        resp = ScheduledBatteryHeatingResp()
+        resp.startTime = epoch_ms
+        resp.status = 1
+
+        self.vehicle_state.handle_scheduled_battery_heating_status(resp)
+
+        topic = self.get_topic(mqtt_topics.DRIVETRAIN_BATTERY_HEATING_SCHEDULE)
+        result = json.loads(self.publisher.map[topic])
+        assert result["startTime"] == "15:30"
+        assert result["mode"] == "on"
+
+    def test_battery_heating_decodes_utc_timestamp_with_user_timezone(self) -> None:
+        """08:00 CET (07:00 UTC) stored as epoch → decoded as 08:00."""
+        cet = ZoneInfo("Europe/Rome")
+        self.vehicle_state.update_user_timezone(cet)
+
+        today = datetime.date.today()
+        local_dt = datetime.datetime(
+            today.year, today.month, today.day, 8, 0, tzinfo=cet
+        )
+        epoch_ms = int(local_dt.timestamp()) * 1000
+
+        resp = ScheduledBatteryHeatingResp()
+        resp.startTime = epoch_ms
+        resp.status = 1
+
+        self.vehicle_state.handle_scheduled_battery_heating_status(resp)
+
+        topic = self.get_topic(mqtt_topics.DRIVETRAIN_BATTERY_HEATING_SCHEDULE)
+        result = json.loads(self.publisher.map[topic])
+        assert result["startTime"] == "08:00"
+        assert result["mode"] == "on"
 
     @staticmethod
     def get_topic(sub_topic: str) -> str:

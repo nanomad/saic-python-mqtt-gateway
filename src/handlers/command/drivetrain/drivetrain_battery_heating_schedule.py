@@ -61,7 +61,9 @@ class DrivetrainBatteryHeatingScheduleCommand(
             if should_enable:
                 LOG.info(f"Setting battery heating schedule to {start_time}")
                 await self.saic_api.enable_schedule_battery_heating(
-                    self.vin, start_time=start_time
+                    self.vin,
+                    start_time=start_time,
+                    tz=self.vehicle_state.user_timezone,
                 )
             else:
                 LOG.info("Disabling battery heating schedule")

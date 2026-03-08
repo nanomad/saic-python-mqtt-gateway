@@ -5,6 +5,7 @@ from enum import Enum, unique
 import logging
 import math
 from typing import TYPE_CHECKING, Any, Final, TypeVar
+from zoneinfo import ZoneInfo
 
 from apscheduler.triggers.cron import CronTrigger
 from saic_ismart_client_ng.api.vehicle_charging import (
@@ -71,6 +72,7 @@ class VehicleState:
         account_prefix: str,
         vin_info: VehicleInfo,
         charge_polling_min_percent: float = 1.0,
+        user_timezone: ZoneInfo | None = None,
     ) -> None:
         self.publisher = publisher
         self.__message_publisher = MessagePublisher(vin_info, publisher, account_prefix)
@@ -110,6 +112,7 @@ class VehicleState:
         self.__scheduler = scheduler
         self.__scheduled_battery_heating_enabled = False
         self.__scheduled_battery_heating_start: datetime.time | None = None
+        self.__user_timezone: ZoneInfo | None = user_timezone
 
     def set_refresh_period_active(self, seconds: int) -> None:
         if seconds != self.refresh_period_active:
@@ -211,9 +214,11 @@ class VehicleState:
             ScheduledChargingMode.UNTIL_CONFIGURED_TIME,
             ScheduledChargingMode.UNTIL_CONFIGURED_SOC,
         ]:
+            tz = self.__user_timezone
             if self.refresh_period_inactive_grace > 0:
                 # Add a grace period to the start time, so that the car is not woken up too early
-                dt = datetime.datetime.now().replace(
+                now = datetime.datetime.now(tz=tz) if tz else datetime.datetime.now().astimezone()
+                dt = now.replace(
                     hour=start_time.hour,
                     minute=start_time.minute,
                     second=0,
@@ -221,12 +226,14 @@ class VehicleState:
                 ) + datetime.timedelta(seconds=self.refresh_period_inactive_grace)
                 start_time = dt.time()
             trigger = CronTrigger.from_crontab(
-                f"{start_time.minute} {start_time.hour} * * *"
+                f"{start_time.minute} {start_time.hour} * * *",
+                timezone=tz,
             )
+            tz_label = f" ({tz})" if tz else ""
             if existing_job is not None:
                 existing_job.reschedule(trigger=trigger)
                 LOG.info(
-                    f"Rescheduled check for charging start for VIN {self.vin} at {start_time}"
+                    f"Rescheduled check for charging start for VIN {self.vin} at {start_time}{tz_label}"
                 )
             else:
                 self.__scheduler.add_job(
@@ -239,7 +246,7 @@ class VehicleState:
                     replace_existing=True,
                 )
                 LOG.info(
-                    f"Scheduled check for charging start for VIN {self.vin} at {start_time}"
+                    f"Scheduled check for charging start for VIN {self.vin} at {start_time}{tz_label}"
                 )
         elif existing_job is not None:
             existing_job.remove()
@@ -581,13 +588,22 @@ class VehicleState:
                 value=soc,
             )
 
+    @property
+    def user_timezone(self) -> ZoneInfo | None:
+        return self.__user_timezone
+
+    def update_user_timezone(self, tz: ZoneInfo) -> None:
+        self.__user_timezone = tz
+
     def handle_scheduled_battery_heating_status(
         self, scheduled_battery_heating_status: ScheduledBatteryHeatingResp | None
     ) -> None:
         if scheduled_battery_heating_status:
             is_enabled = scheduled_battery_heating_status.is_enabled
             if is_enabled:
-                start_time = scheduled_battery_heating_status.decoded_start_time
+                start_time = scheduled_battery_heating_status.decode_start_time(
+                    self.__user_timezone
+                )
             else:
                 start_time = self.__scheduled_battery_heating_start
         else:

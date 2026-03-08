@@ -184,6 +184,8 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
         tz = await self.__fetch_user_timezone()
         if tz is not None:
             self.__user_timezone = tz
+            for vh in self.vehicle_handlers.values():
+                vh.vehicle_state.update_user_timezone(tz)
         tz_str = (
             str(self.__user_timezone) if self.__user_timezone is not None else "unknown"
         )
@@ -257,6 +259,7 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
             account_prefix,
             info,
             charge_polling_min_percent=self.configuration.charge_dynamic_polling_min_percentage,
+            user_timezone=self.__user_timezone,
         )
         return VehicleHandler(
             self.configuration,
