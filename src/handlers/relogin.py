@@ -23,6 +23,7 @@ class ReloginHandler:
         self.__api = api
         self.__login_task = None
         self.__post_login_callbacks: list[Callable[[], Awaitable[None]]] = []
+        self.__login_failure_callbacks: list[Callable[[], Awaitable[None]]] = []
 
     @property
     def relogin_in_progress(self) -> bool:
@@ -30,6 +31,11 @@ class ReloginHandler:
 
     def add_post_login_callback(self, callback: Callable[[], Awaitable[None]]) -> None:
         self.__post_login_callbacks.append(callback)
+
+    def add_login_failure_callback(
+        self, callback: Callable[[], Awaitable[None]]
+    ) -> None:
+        self.__login_failure_callbacks.append(callback)
 
     def relogin(self) -> None:
         if self.__login_task is None:
@@ -53,6 +59,7 @@ class ReloginHandler:
             await self.__run_post_login_callbacks()
         except Exception as e:
             LOG.exception("Could not login to the SAIC API due to an error", exc_info=e)
+            await self.__run_login_failure_callbacks()
             raise
         finally:
             if self.__scheduler.get_job(JOB_ID) is not None:
@@ -65,3 +72,10 @@ class ReloginHandler:
                 await callback()
             except Exception:
                 LOG.warning("Post-login callback failed", exc_info=True)
+
+    async def __run_login_failure_callbacks(self) -> None:
+        for callback in self.__login_failure_callbacks:
+            try:
+                await callback()
+            except Exception:
+                LOG.warning("Login failure callback failed", exc_info=True)

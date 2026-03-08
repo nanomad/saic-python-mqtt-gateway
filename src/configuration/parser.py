@@ -69,6 +69,8 @@ def __setup_gateway_features(args: Namespace, config: Configuration) -> None:
     except ValueError as ve:
         msg = f"No valid integer value for messages_request_interval: {args.messages_request_interval}"
         raise SystemExit(msg) from ve
+    if args.account_refresh_interval:
+        config.account_refresh_interval = args.account_refresh_interval
 
 
 def __setup_openwb(args: Namespace, config: Configuration) -> None:
@@ -367,6 +369,16 @@ def __add_saic_api_argument_group(
         action=EnvDefault,
         envvar="MESSAGES_REQUEST_INTERVAL",
         default=60,
+        type=check_positive,
+    )
+    saic_api.add_argument(
+        "--account-refresh-interval",
+        help="""The interval for refreshing account-level data (vehicle list, timezone) in seconds.""",
+        dest="account_refresh_interval",
+        required=False,
+        action=EnvDefault,
+        envvar="ACCOUNT_REFRESH_INTERVAL",
+        default=24 * 60 * 60,
         type=check_positive,
     )
     saic_api.add_argument(

@@ -126,7 +126,9 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
 
         assert result.target_soc is None
         assert result.scheduled_charging is None
-        assert self.get_topic(mqtt_topics.DRIVETRAIN_SOC_TARGET) not in self.publisher.map
+        assert (
+            self.get_topic(mqtt_topics.DRIVETRAIN_SOC_TARGET) not in self.publisher.map
+        )
 
     def test_republish_command_states_after_configure_missing(self) -> None:
         self.vehicle_state.configure_missing()
@@ -134,9 +136,7 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
 
         self.vehicle_state.republish_command_states()
 
-        self.assert_mqtt_topic(
-            self.get_topic(mqtt_topics.REFRESH_PERIOD_ACTIVE), 30
-        )
+        self.assert_mqtt_topic(self.get_topic(mqtt_topics.REFRESH_PERIOD_ACTIVE), 30)
         self.assert_mqtt_topic(
             self.get_topic(mqtt_topics.REFRESH_PERIOD_INACTIVE), 86400
         )
@@ -157,13 +157,32 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
         self.vehicle_state.republish_command_states()
 
         # Refresh periods are -1 and optional values are None, so they should not be published
-        assert self.get_topic(mqtt_topics.REFRESH_PERIOD_ACTIVE) not in self.publisher.map
-        assert self.get_topic(mqtt_topics.REFRESH_PERIOD_INACTIVE) not in self.publisher.map
-        assert self.get_topic(mqtt_topics.REFRESH_PERIOD_AFTER_SHUTDOWN) not in self.publisher.map
-        assert self.get_topic(mqtt_topics.REFRESH_PERIOD_INACTIVE_GRACE) not in self.publisher.map
-        assert self.get_topic(mqtt_topics.DRIVETRAIN_SOC_TARGET) not in self.publisher.map
-        assert self.get_topic(mqtt_topics.DRIVETRAIN_CHARGECURRENT_LIMIT) not in self.publisher.map
-        assert self.get_topic(mqtt_topics.CLIMATE_REMOTE_TEMPERATURE) not in self.publisher.map
+        assert (
+            self.get_topic(mqtt_topics.REFRESH_PERIOD_ACTIVE) not in self.publisher.map
+        )
+        assert (
+            self.get_topic(mqtt_topics.REFRESH_PERIOD_INACTIVE)
+            not in self.publisher.map
+        )
+        assert (
+            self.get_topic(mqtt_topics.REFRESH_PERIOD_AFTER_SHUTDOWN)
+            not in self.publisher.map
+        )
+        assert (
+            self.get_topic(mqtt_topics.REFRESH_PERIOD_INACTIVE_GRACE)
+            not in self.publisher.map
+        )
+        assert (
+            self.get_topic(mqtt_topics.DRIVETRAIN_SOC_TARGET) not in self.publisher.map
+        )
+        assert (
+            self.get_topic(mqtt_topics.DRIVETRAIN_CHARGECURRENT_LIMIT)
+            not in self.publisher.map
+        )
+        assert (
+            self.get_topic(mqtt_topics.CLIMATE_REMOTE_TEMPERATURE)
+            not in self.publisher.map
+        )
         # refresh_mode defaults to RefreshMode.OFF (never None), so it IS always published
         self.assert_mqtt_topic(
             self.get_topic(mqtt_topics.REFRESH_MODE), RefreshMode.OFF.value

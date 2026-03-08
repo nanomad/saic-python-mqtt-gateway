@@ -128,3 +128,44 @@ class TestReloginHandler(unittest.IsolatedAsyncioTestCase):
             await self.handler.login()
 
         assert self.handler.relogin_in_progress is False
+
+    async def test_failure_callback_runs_on_login_failure(self) -> None:
+        self.mock_api.login.side_effect = RuntimeError("login failed")
+        callback = AsyncMock()
+        self.handler.add_login_failure_callback(callback)
+
+        with pytest.raises(RuntimeError, match="login failed"):
+            await self.handler.login()
+
+        callback.assert_awaited_once()
+
+    async def test_failure_callback_not_run_on_success(self) -> None:
+        callback = AsyncMock()
+        self.handler.add_login_failure_callback(callback)
+
+        await self.handler.login()
+
+        callback.assert_not_awaited()
+
+    async def test_failing_failure_callback_does_not_block_others(self) -> None:
+        self.mock_api.login.side_effect = RuntimeError("login failed")
+        failing_callback = AsyncMock(side_effect=RuntimeError("callback error"))
+        ok_callback = AsyncMock()
+        self.handler.add_login_failure_callback(failing_callback)
+        self.handler.add_login_failure_callback(ok_callback)
+
+        with pytest.raises(RuntimeError, match="login failed"):
+            await self.handler.login()
+
+        failing_callback.assert_awaited_once()
+        ok_callback.assert_awaited_once()
+
+    async def test_failure_callback_does_not_prevent_reraise(self) -> None:
+        self.mock_api.login.side_effect = RuntimeError("login failed")
+        callback = AsyncMock()
+        self.handler.add_login_failure_callback(callback)
+
+        with pytest.raises(RuntimeError, match="login failed"):
+            await self.handler.login()
+
+        callback.assert_awaited_once()
