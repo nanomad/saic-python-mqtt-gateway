@@ -5,7 +5,6 @@ from enum import Enum, unique
 import logging
 import math
 from typing import TYPE_CHECKING, Any, Final, TypeVar
-from zoneinfo import ZoneInfo
 
 from apscheduler.triggers.cron import CronTrigger
 from saic_ismart_client_ng.api.vehicle_charging import (
@@ -31,6 +30,7 @@ from utils import datetime_to_str
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from zoneinfo import ZoneInfo
 
     from apscheduler.job import Job
     from apscheduler.schedulers.base import BaseScheduler

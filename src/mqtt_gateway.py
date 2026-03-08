@@ -250,7 +250,7 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
 
     def __create_vehicle_handler(self, vin_info: VinInfo) -> VehicleHandler:
         vin = vin_info.vin
-        total_battery_capacity = self.configuration.battery_capacity_map.get(vin, None)
+        total_battery_capacity = self.configuration.battery_capacity_map.get(vin, None) if vin else None
         info = VehicleInfo(vin_info, total_battery_capacity)
         account_prefix = f"{self.configuration.saic_user}/{mqtt_topics.VEHICLES}/{vin}"
         vehicle_state = VehicleState(
