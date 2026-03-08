@@ -74,8 +74,15 @@ class MessageHandler:
             for vehicle_start_message in vehicle_start_messages:
                 await self.__delete_message(vehicle_start_message)
         except SaicLogoutException as e:
-            LOG.error("API Client was logged out, waiting for a new login", exc_info=e)
-            self.relogin_handler.relogin()
+            LOG.warning(
+                "API Client was logged out, attempting immediate relogin",
+                exc_info=e,
+            )
+            try:
+                await self.relogin_handler.force_login()
+            except Exception:
+                LOG.warning("Immediate relogin failed, scheduling delayed relogin")
+                self.relogin_handler.relogin()
         except SaicApiException as e:
             LOG.exception(
                 "MessageHandler poll loop failed during SAIC API Call", exc_info=e

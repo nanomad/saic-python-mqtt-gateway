@@ -169,3 +169,30 @@ class TestReloginHandler(unittest.IsolatedAsyncioTestCase):
             await self.handler.login()
 
         callback.assert_awaited_once()
+
+    async def test_force_login_cancels_pending_relogin(self) -> None:
+        mock_job = MagicMock()
+        self.mock_scheduler.add_job.return_value = mock_job
+        self.mock_scheduler.get_job.return_value = mock_job
+        self.handler.relogin()
+        assert self.handler.relogin_in_progress is True
+
+        await self.handler.force_login()
+        self._assert_force_login_succeeded()
+        self.mock_scheduler.remove_job.assert_called()
+
+    async def test_force_login_works_without_pending_relogin(self) -> None:
+        await self.handler.force_login()
+        self._assert_force_login_succeeded()
+
+    async def test_force_login_raises_on_login_failure(self) -> None:
+        self.mock_api.login.side_effect = RuntimeError("login failed")
+
+        with pytest.raises(RuntimeError, match="login failed"):
+            await self.handler.force_login()
+
+        assert not self.handler.relogin_in_progress
+
+    def _assert_force_login_succeeded(self) -> None:
+        assert not self.handler.relogin_in_progress
+        self.mock_api.login.assert_awaited_once()

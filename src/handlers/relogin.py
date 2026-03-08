@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
+    from apscheduler.job import Job
     from apscheduler.schedulers.base import BaseScheduler
     from saic_ismart_client_ng import SaicApi
 
@@ -21,7 +22,7 @@ class ReloginHandler:
         self.__relogin_relay = relogin_relay
         self.__scheduler = scheduler
         self.__api = api
-        self.__login_task = None
+        self.__login_task: Job | None = None
         self.__post_login_callbacks: list[Callable[[], Awaitable[None]]] = []
         self.__login_failure_callbacks: list[Callable[[], Awaitable[None]]] = []
 
@@ -50,6 +51,15 @@ class ReloginHandler:
                 name="Re-login the API client after a set delay",
                 max_instances=1,
             )
+
+    async def force_login(self) -> None:
+        """Cancel any pending delayed relogin and login immediately."""
+        if self.__login_task is not None:
+            LOG.info("Cancelling pending delayed relogin for immediate login")
+            if self.__scheduler.get_job(JOB_ID) is not None:
+                self.__scheduler.remove_job(JOB_ID)
+            self.__login_task = None
+        await self.login()
 
     async def login(self) -> None:
         try:

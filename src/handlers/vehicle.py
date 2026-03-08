@@ -138,10 +138,15 @@ class VehicleHandler:
                     await self.__polling()
                 except SaicLogoutException as e:
                     self.vehicle_state.mark_failed_refresh()
-                    LOG.error(
-                        "API Client was logged out, waiting for a new login", exc_info=e
+                    LOG.warning(
+                        "API Client was logged out, attempting immediate relogin",
+                        exc_info=e,
                     )
-                    self.relogin_handler.relogin()
+                    try:
+                        await self.relogin_handler.force_login()
+                    except Exception:
+                        LOG.warning("Immediate relogin failed, scheduling delayed relogin")
+                        self.relogin_handler.relogin()
                 except SaicApiException as e:
                     self.vehicle_state.mark_failed_refresh()
                     LOG.exception(
