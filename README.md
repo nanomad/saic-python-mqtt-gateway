@@ -51,6 +51,7 @@ The following are the known available endpoints:
 |---------------------------------------------|-------------|--------------------------------------------------------------------------------------------------------------------------------------|
 | https://gateway-mg-au.soimt.com/api.app/v1/ | au          | This endpoint is not used by the iSmart app for Australia and New Zealand but has been tested and proven to work in these countries. |
 | https://gateway-mg-eu.soimt.com/api.app/v1/ | eu          |                                                                                                                                      |
+| https://gateway-mg-tr.soimt.com/api.app/v1/ | tr          | This endpoint is valid for the country of Türkiye.                                                                                   |
 
 ### MQTT Broker
 
