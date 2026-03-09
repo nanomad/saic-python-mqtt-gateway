@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 from asyncio import Task
 import datetime
-from importlib.metadata import version
 import logging
 from random import uniform
 import re
@@ -25,7 +24,7 @@ from publisher.core import MqttCommandListener, Publisher
 from publisher.log_publisher import ConsolePublisher
 from publisher.mqtt_publisher import MqttPublisher
 from saic_api_listener import MqttGatewaySaicApiListener
-from utils import datetime_to_str
+from utils import datetime_to_str, get_gateway_version
 from vehicle import VehicleState
 from vehicle_info import VehicleInfo
 
@@ -205,7 +204,7 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
         await self.__refresh_user_timezone()
         self.__publish_account_str(
             mqtt_topics.ACCOUNT_GATEWAY_VERSION,
-            version("saic-python-mqtt-gateway"),
+            get_gateway_version(),
         )
         self.__publish_account_int(
             mqtt_topics.ACCOUNT_REFRESH_INTERVAL,

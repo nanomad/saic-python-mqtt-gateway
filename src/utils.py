@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from importlib.metadata import PackageNotFoundError, version
+import os
 from typing import TYPE_CHECKING, TypeVar
 
 from saic_ismart_client_ng.api.schema import GpsStatus
@@ -50,6 +52,13 @@ def get_update_timestamp(vehicle_status: VehicleStatusResp) -> datetime:
     if reference_drift < timedelta(minutes=15):
         return reference_time
     return now_time
+
+
+def get_gateway_version() -> str:
+    try:
+        return version("saic-python-mqtt-gateway")
+    except PackageNotFoundError:
+        return os.environ.get("RELEASE_VERSION", "unknown")
 
 
 def datetime_to_str(dt: datetime) -> str:
