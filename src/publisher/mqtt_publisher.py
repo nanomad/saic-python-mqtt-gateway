@@ -6,6 +6,8 @@ import ssl
 from typing import TYPE_CHECKING, Any, override
 
 import aiomqtt
+from aiomqtt.exceptions import MqttConnectError
+from paho.mqtt.reasoncodes import ReasonCode
 
 import mqtt_topics
 from publisher.core import Publisher
@@ -15,6 +17,20 @@ if TYPE_CHECKING:
     from integrations.openwb.charging_station import ChargingStation
 
 LOG = logging.getLogger(__name__)
+
+# MQTT CONNACK "Server unavailable" return codes — the only transient
+# connection refusal that warrants a retry. All other CONNACK refusal
+# codes (bad credentials, protocol mismatch, etc.) are fatal.
+_CONNACK_RC_SERVER_UNAVAILABLE_V311 = 3     # MQTT v3.1.1
+_CONNACK_RC_SERVER_UNAVAILABLE_V5 = 0x88    # MQTT v5
+
+
+def _is_transient_connect_error(rc: int | ReasonCode | None) -> bool:
+    if rc is None:
+        return False
+    if isinstance(rc, ReasonCode):
+        return rc.value == _CONNACK_RC_SERVER_UNAVAILABLE_V5
+    return rc == _CONNACK_RC_SERVER_UNAVAILABLE_V311
 
 
 class MqttPublisher(Publisher):
@@ -95,15 +111,29 @@ class MqttPublisher(Publisher):
                             message.qos,
                             message.properties,
                         )
-            except aiomqtt.MqttError:
+            except MqttConnectError as e:
+                if not _is_transient_connect_error(e.rc):
+                    LOG.error("Fatal MQTT connection error: %s", e)
+                    msg = f"Unable to connect to MQTT broker: {e}"
+                    raise SystemExit(msg) from e
                 LOG.warning(
-                    "Connection to %s:%s lost; Reconnecting in %d seconds ...",
+                    "Connection to %s:%s refused: %s; Reconnecting in %d seconds ...",
                     self.host,
                     self.port,
+                    e,
                     reconnect_interval,
                 )
                 await asyncio.sleep(reconnect_interval)
-            except asyncio.exceptions.CancelledError:
+            except aiomqtt.MqttError as e:
+                LOG.warning(
+                    "Connection to %s:%s lost: %s; Reconnecting in %d seconds ...",
+                    self.host,
+                    self.port,
+                    e,
+                    reconnect_interval,
+                )
+                await asyncio.sleep(reconnect_interval)
+            except asyncio.CancelledError:
                 LOG.debug("MQTT publisher loop cancelled")
                 raise
             finally:
