@@ -3,17 +3,14 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from importlib.metadata import PackageNotFoundError, version
 import os
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
 from saic_ismart_client_ng.api.schema import GpsStatus
 
 if TYPE_CHECKING:
     from saic_ismart_client_ng.api.vehicle import VehicleStatusResp
 
-Numeric = TypeVar("Numeric", int, float)
-
-
-def value_in_range(
+def value_in_range[Numeric: (int, float)](
     value: Numeric,
     min_value: Numeric,
     max_value: Numeric,

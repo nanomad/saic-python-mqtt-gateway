@@ -181,7 +181,7 @@ class BasicVehicleStatusPublisher(
         self._transform_and_publish(
             topic=mqtt_topics.CLIMATE_REMOTE_CLIMATE_STATE,
             value=remote_climate_status,
-            transform=lambda x: to_remote_climate(x),
+            transform=to_remote_climate,
         )
 
         remote_ac_running = remote_climate_status == 2
