@@ -53,8 +53,9 @@ class MqttPublisher(Publisher):
 
     async def __run_loop(self) -> None:
         if not self.host:
-            LOG.info("MQTT host is not configured")
-            return
+            msg = "MQTT host is not configured"
+            LOG.error(msg)
+            raise SystemExit(msg)
         ssl_context: ssl.SSLContext | None = None
         if self.transport_protocol.with_tls:
             ssl_context = ssl.create_default_context()
@@ -146,7 +147,18 @@ class MqttPublisher(Publisher):
             LOG.warning("MQTT client is already running")
             return
         self.__running = asyncio.create_task(self.__run_loop())
-        await self.__connected.wait()
+        # Wait for either a successful connection or the run loop to exit
+        # (e.g. due to missing host, fatal error, or unexpected exception)
+        connected_waiter = asyncio.create_task(self.__connected.wait())
+        done, _pending = await asyncio.wait(
+            {self.__running, connected_waiter},
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if connected_waiter not in done:
+            connected_waiter.cancel()
+        if self.__running in done:
+            # The run loop exited before connecting — propagate the error
+            self.__running.result()
 
     async def __on_connect(self) -> None:
         LOG.info("Connected to MQTT broker")
