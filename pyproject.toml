@@ -33,7 +33,7 @@ package-mode = false
 requires-poetry = '>=2.0,<3.0'
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.2.2"
+pytest = "^9.0.0"
 mock = "^5.1.0"
 coverage = "^7.5.4"
 ruff = "^0.15.0"
