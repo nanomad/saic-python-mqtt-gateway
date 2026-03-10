@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, override
+from typing import TYPE_CHECKING, Any, override
 
 from publisher.core import Publisher
+
+if TYPE_CHECKING:
+    from configuration import QoS
 
 LOG = logging.getLogger(__name__)
 LOG.setLevel(level="DEBUG")
@@ -29,7 +32,7 @@ class ConsolePublisher(Publisher):
         data: dict[str, Any],
         no_prefix: bool = False,
         retain: bool = True,
-        qos: int = 0,
+        qos: QoS = 0,
     ) -> None:
         anonymized_json = self.dict_to_anonymized_json(data)
         self.internal_publish(key, anonymized_json)
@@ -41,7 +44,7 @@ class ConsolePublisher(Publisher):
         value: str,
         no_prefix: bool = False,
         retain: bool = True,
-        qos: int = 0,
+        qos: QoS = 0,
     ) -> None:
         self.internal_publish(key, value)
 
@@ -52,7 +55,7 @@ class ConsolePublisher(Publisher):
         value: int,
         no_prefix: bool = False,
         retain: bool = True,
-        qos: int = 0,
+        qos: QoS = 0,
     ) -> None:
         self.internal_publish(key, value)
 
@@ -63,7 +66,7 @@ class ConsolePublisher(Publisher):
         value: bool,
         no_prefix: bool = False,
         retain: bool = True,
-        qos: int = 0,
+        qos: QoS = 0,
     ) -> None:
         self.internal_publish(key, value)
 
@@ -74,12 +77,12 @@ class ConsolePublisher(Publisher):
         value: float,
         no_prefix: bool = False,
         retain: bool = True,
-        qos: int = 0,
+        qos: QoS = 0,
     ) -> None:
         self.internal_publish(key, value)
 
     @override
-    def clear_topic(self, key: str, no_prefix: bool = False, qos: int = 0) -> None:
+    def clear_topic(self, key: str, no_prefix: bool = False, qos: QoS = 0) -> None:
         self.internal_publish(key, None)
 
     def internal_publish(self, key: str, value: Any) -> None:

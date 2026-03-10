@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 
 
 Transport = Literal["tcp", "websockets"]
+QoS = Literal[0, 1, 2]
 
 
 class TransportProtocol(Enum):

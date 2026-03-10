@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import mqtt_topics
 
 if TYPE_CHECKING:
-    from configuration import Configuration
+    from configuration import Configuration, QoS
 
 T = TypeVar("T")
 
@@ -68,7 +68,7 @@ class Publisher(ABC):
         data: dict[str, Any],
         no_prefix: bool = False,
         retain: bool = True,
-        qos: int = 0,
+        qos: QoS = 0,
     ) -> None:
         raise NotImplementedError
 
@@ -79,7 +79,7 @@ class Publisher(ABC):
         value: str,
         no_prefix: bool = False,
         retain: bool = True,
-        qos: int = 0,
+        qos: QoS = 0,
     ) -> None:
         raise NotImplementedError
 
@@ -90,7 +90,7 @@ class Publisher(ABC):
         value: int,
         no_prefix: bool = False,
         retain: bool = True,
-        qos: int = 0,
+        qos: QoS = 0,
     ) -> None:
         raise NotImplementedError
 
@@ -101,7 +101,7 @@ class Publisher(ABC):
         value: bool,
         no_prefix: bool = False,
         retain: bool = True,
-        qos: int = 0,
+        qos: QoS = 0,
     ) -> None:
         raise NotImplementedError
 
@@ -112,12 +112,12 @@ class Publisher(ABC):
         value: float,
         no_prefix: bool = False,
         retain: bool = True,
-        qos: int = 0,
+        qos: QoS = 0,
     ) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def clear_topic(self, key: str, no_prefix: bool = False, qos: int = 0) -> None:
+    def clear_topic(self, key: str, no_prefix: bool = False, qos: QoS = 0) -> None:
         raise NotImplementedError
 
     def get_mqtt_account_prefix(self) -> str:

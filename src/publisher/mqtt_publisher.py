@@ -13,7 +13,7 @@ import mqtt_topics
 from publisher.core import Publisher
 
 if TYPE_CHECKING:
-    from configuration import Configuration
+    from configuration import Configuration, QoS
     from integrations.openwb.charging_station import ChargingStation
 
 LOG = logging.getLogger(__name__)
@@ -266,7 +266,7 @@ class MqttPublisher(Publisher):
                 )
 
     def __publish(
-        self, topic: str, payload: Any, retain: bool = True, qos: int = 0
+        self, topic: str, payload: Any, retain: bool = True, qos: QoS = 0
     ) -> None:
         LOG.debug("Publishing to MQTT topic %s with payload %s", topic, payload)
         task = asyncio.create_task(
@@ -275,7 +275,7 @@ class MqttPublisher(Publisher):
         task.add_done_callback(self.__handle_task_exception)
 
     async def __async_publish(
-        self, topic: str, payload: Any, retain: bool, qos: int
+        self, topic: str, payload: Any, retain: bool, qos: QoS
     ) -> None:
         if not (self.client and self.is_connected()):
             LOG.error("Failed to publish: MQTT client is not connected")
@@ -306,7 +306,7 @@ class MqttPublisher(Publisher):
         data: dict[str, Any],
         no_prefix: bool = False,
         retain: bool = True,
-        qos: int = 0,
+        qos: QoS = 0,
     ) -> None:
         payload = self.dict_to_anonymized_json(data)
         self.__publish(
@@ -323,7 +323,7 @@ class MqttPublisher(Publisher):
         value: str,
         no_prefix: bool = False,
         retain: bool = True,
-        qos: int = 0,
+        qos: QoS = 0,
     ) -> None:
         self.__publish(
             topic=self.get_topic(key, no_prefix), payload=value, retain=retain, qos=qos
@@ -336,7 +336,7 @@ class MqttPublisher(Publisher):
         value: int,
         no_prefix: bool = False,
         retain: bool = True,
-        qos: int = 0,
+        qos: QoS = 0,
     ) -> None:
         self.__publish(
             topic=self.get_topic(key, no_prefix), payload=value, retain=retain, qos=qos
@@ -349,7 +349,7 @@ class MqttPublisher(Publisher):
         value: bool,
         no_prefix: bool = False,
         retain: bool = True,
-        qos: int = 0,
+        qos: QoS = 0,
     ) -> None:
         self.__publish(
             topic=self.get_topic(key, no_prefix), payload=value, retain=retain, qos=qos
@@ -362,14 +362,14 @@ class MqttPublisher(Publisher):
         value: float,
         no_prefix: bool = False,
         retain: bool = True,
-        qos: int = 0,
+        qos: QoS = 0,
     ) -> None:
         self.__publish(
             topic=self.get_topic(key, no_prefix), payload=value, retain=retain, qos=qos
         )
 
     @override
-    def clear_topic(self, key: str, no_prefix: bool = False, qos: int = 0) -> None:
+    def clear_topic(self, key: str, no_prefix: bool = False, qos: QoS = 0) -> None:
         self.__publish(topic=self.get_topic(key, no_prefix), payload=None, qos=qos)
 
     def get_vin_from_topic(self, topic: str) -> str:
