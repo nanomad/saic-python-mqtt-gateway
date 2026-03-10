@@ -102,8 +102,8 @@ class MqttPublisher(Publisher):
                 )
                 async with client as client_context:
                     self.client = client_context
-                    self.__connected.set()
                     await self.__on_connect()
+                    self.__connected.set()
                     async for message in client_context.messages:
                         await self._on_message(
                             client_context,
@@ -175,7 +175,7 @@ class MqttPublisher(Publisher):
         task.add_done_callback(self.__handle_task_exception)
 
     async def __enable_commands(self) -> None:
-        if not self.__connected.is_set() or not self.client:
+        if not self.client:
             LOG.error("Failed to enable commands: MQTT client is not connected")
             return
         try:
