@@ -266,7 +266,7 @@ class MqttPublisher(Publisher):
                 )
 
     def __publish(
-        self, topic: str, payload: Any, retain: bool = False, qos: int = 0
+        self, topic: str, payload: Any, retain: bool = True, qos: int = 0
     ) -> None:
         LOG.debug("Publishing to MQTT topic %s with payload %s", topic, payload)
         task = asyncio.create_task(
@@ -305,7 +305,7 @@ class MqttPublisher(Publisher):
         key: str,
         data: dict[str, Any],
         no_prefix: bool = False,
-        retain: bool = False,
+        retain: bool = True,
         qos: int = 0,
     ) -> None:
         payload = self.dict_to_anonymized_json(data)
@@ -322,7 +322,7 @@ class MqttPublisher(Publisher):
         key: str,
         value: str,
         no_prefix: bool = False,
-        retain: bool = False,
+        retain: bool = True,
         qos: int = 0,
     ) -> None:
         self.__publish(
@@ -335,7 +335,7 @@ class MqttPublisher(Publisher):
         key: str,
         value: int,
         no_prefix: bool = False,
-        retain: bool = False,
+        retain: bool = True,
         qos: int = 0,
     ) -> None:
         self.__publish(
@@ -348,7 +348,7 @@ class MqttPublisher(Publisher):
         key: str,
         value: bool,
         no_prefix: bool = False,
-        retain: bool = False,
+        retain: bool = True,
         qos: int = 0,
     ) -> None:
         self.__publish(
@@ -361,7 +361,7 @@ class MqttPublisher(Publisher):
         key: str,
         value: float,
         no_prefix: bool = False,
-        retain: bool = False,
+        retain: bool = True,
         qos: int = 0,
     ) -> None:
         self.__publish(
