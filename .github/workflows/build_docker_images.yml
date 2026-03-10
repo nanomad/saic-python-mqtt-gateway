@@ -40,33 +40,31 @@ jobs:
           - linux/arm64
           - linux/arm/v7
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set platform slug
         id: platform
         run: echo "slug=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> "$GITHUB_OUTPUT"
 
+      - name: Set repository lowercase
+        id: repo
+        run: echo "lowercase=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - id: lowercase-repository
-        name: Lowercase repository
-        uses: ASzc/change-string-case-action@v6
-        with:
-          string: ${{ github.repository }}
-
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           build-args: |
@@ -77,7 +75,7 @@ jobs:
           cache-from: ${{ inputs.use-cache && 'type=gha' || '' }}
           cache-to: ${{ inputs.use-cache && 'type=gha,mode=max' || '' }}
           tags: |
-            ghcr.io/${{ steps.lowercase-repository.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ inputs.image-tag }}-${{ steps.platform.outputs.slug }}
+            ghcr.io/${{ steps.repo.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ inputs.image-tag }}-${{ steps.platform.outputs.slug }}
 
   merge:
     runs-on: ubuntu-latest
@@ -86,32 +84,30 @@ jobs:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_ORGANIZATION: ${{ secrets.DOCKERHUB_ORGANIZATION == null && secrets.DOCKERHUB_USERNAME || secrets.DOCKERHUB_ORGANIZATION }}
     steps:
-      - id: lowercase-repository
-        name: Lowercase repository
-        uses: ASzc/change-string-case-action@v6
-        with:
-          string: ${{ github.repository }}
+      - name: Set repository lowercase
+        id: repo
+        run: echo "lowercase=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         if: env.DOCKERHUB_USERNAME != null
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Create GHCR multi-arch manifest
         run: |
-          GHCR_BASE="ghcr.io/${{ steps.lowercase-repository.outputs.lowercase }}/${{ env.IMAGE_NAME }}"
+          GHCR_BASE="ghcr.io/${{ steps.repo.outputs.lowercase }}/${{ env.IMAGE_NAME }}"
           for tag in "${{ inputs.image-tag }}" "${{ inputs.version-tag }}"; do
             docker buildx imagetools create -t "${GHCR_BASE}:${tag}" \
               "${GHCR_BASE}:${{ inputs.image-tag }}-linux-amd64" \
@@ -122,7 +118,7 @@ jobs:
       - name: Create DockerHub multi-arch manifest
         if: env.DOCKERHUB_ORGANIZATION != null
         run: |
-          GHCR_BASE="ghcr.io/${{ steps.lowercase-repository.outputs.lowercase }}/${{ env.IMAGE_NAME }}"
+          GHCR_BASE="ghcr.io/${{ steps.repo.outputs.lowercase }}/${{ env.IMAGE_NAME }}"
           DH_BASE="${{ env.DOCKERHUB_ORGANIZATION }}/${{ env.DOCKERHUB_IMAGE_NAME }}"
           for tag in "${{ inputs.image-tag }}" "${{ inputs.version-tag }}"; do
             docker buildx imagetools create -t "${DH_BASE}:${tag}" \
