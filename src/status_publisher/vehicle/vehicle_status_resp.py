@@ -84,7 +84,7 @@ class VehicleStatusRespPublisher(
 
         self._publish(
             topic=mqtt_topics.REFRESH_LAST_VEHICLE_STATE,
-            value=datetime.datetime.now(),
+            value=datetime.datetime.now(tz=datetime.UTC),
         )
 
         return VehicleStatusRespProcessingResult(

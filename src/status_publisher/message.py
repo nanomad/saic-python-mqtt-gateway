@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, override
 
 from saic_ismart_client_ng.api.message import MessageEntity
@@ -26,12 +26,12 @@ class MessagePublisher(
         self, vin: VehicleInfo, publisher: Publisher, mqtt_vehicle_prefix: str
     ) -> None:
         super().__init__(vin, publisher, mqtt_vehicle_prefix)
-        self.__last_car_vehicle_message = datetime.min
+        self.__last_car_vehicle_message = datetime.min.replace(tzinfo=UTC)
 
     @override
     def publish(self, message: MessageEntity) -> MessagePublisherProcessingResult:
         if (
-            self.__last_car_vehicle_message == datetime.min
+            self.__last_car_vehicle_message == datetime.min.replace(tzinfo=UTC)
             or message.message_time > self.__last_car_vehicle_message
         ):
             self.__last_car_vehicle_message = message.message_time
