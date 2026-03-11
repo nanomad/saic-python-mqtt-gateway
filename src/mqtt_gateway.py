@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from asyncio import Task
+import contextlib
 import datetime
 import logging
 from random import uniform
@@ -316,7 +317,11 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
             LOG.warning("Vehicle %s no longer in API vehicle list, stopping", vin)
             vh = self.vehicle_handlers.pop(vin)
             vh.vehicle_state.mark_failed_refresh()
-            self.__cancel_vehicle_task(vin)
+            task = self.__cancel_vehicle_task(vin)
+            if task is not None:
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+            await vh.close()
 
     def __start_vehicle_task(self, vh: VehicleHandler) -> None:
         vin = vh.vin_info.vin
@@ -324,11 +329,18 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
         self.__vehicle_tasks.append(task)
         LOG.info("Started polling task for vehicle %s", vin)
 
-    def __cancel_vehicle_task(self, vin: str) -> None:
+    def __cancel_vehicle_task(self, vin: str) -> Task[Any] | None:
         task_name = f"handle_vehicle_{vin}"
+        cancelled_task = None
+        remaining = []
         for t in self.__vehicle_tasks:
             if t.get_name() == task_name:
                 t.cancel()
+                cancelled_task = t
+            else:
+                remaining.append(t)
+        self.__vehicle_tasks = remaining
+        return cancelled_task
 
     @override
     def get_vehicle_handler(self, vin: str) -> VehicleHandler | None:
