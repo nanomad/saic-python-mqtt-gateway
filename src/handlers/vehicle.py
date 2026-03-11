@@ -121,6 +121,11 @@ class VehicleHandler:
             listener=api_listener,
         )
 
+    async def close(self) -> None:
+        await self.abrp_api.close()
+        if self.osmand_api is not None:
+            await self.osmand_api.close()
+
     async def handle_vehicle(self) -> None:
         start_time = datetime.datetime.now()
         self.__vehicle_info_publisher.publish()

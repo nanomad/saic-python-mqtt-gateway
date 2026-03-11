@@ -317,6 +317,7 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
             vh = self.vehicle_handlers.pop(vin)
             vh.vehicle_state.mark_failed_refresh()
             self.__cancel_vehicle_task(vin)
+            await vh.close()
 
     def __start_vehicle_task(self, vh: VehicleHandler) -> None:
         vin = vh.vin_info.vin
@@ -326,9 +327,13 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
 
     def __cancel_vehicle_task(self, vin: str) -> None:
         task_name = f"handle_vehicle_{vin}"
+        remaining = []
         for t in self.__vehicle_tasks:
             if t.get_name() == task_name:
                 t.cancel()
+            else:
+                remaining.append(t)
+        self.__vehicle_tasks = remaining
 
     @override
     def get_vehicle_handler(self, vin: str) -> VehicleHandler | None:
