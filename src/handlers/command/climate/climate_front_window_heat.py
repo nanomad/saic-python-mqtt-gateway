@@ -26,7 +26,7 @@ class ClimateFrontWindowHeatCommand(BooleanCommandHandler[None]):
 
     @override
     async def handle_false(self) -> None:
-        LOG.info("Front window heating will be switched off")
+        LOG.info("AC will be stopped (no dedicated front defrost stop API available)")
         await self.saic_api.stop_ac(self.vin)
 
     @override
