@@ -28,7 +28,7 @@ class MessageHandler:
         self.gateway = gateway
         self.saicapi = saicapi
         self.relogin_handler = relogin_handler
-        self.last_message_ts = datetime.datetime.min
+        self.last_message_ts = datetime.datetime.min.replace(tzinfo=datetime.UTC)
         self.last_message_id: str | int | None = None
 
     async def check_for_new_messages(self) -> None:

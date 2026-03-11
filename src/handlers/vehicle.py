@@ -129,7 +129,7 @@ class VehicleHandler:
                 await self.osmand_api.close()
 
     async def handle_vehicle(self) -> None:
-        start_time = datetime.datetime.now()
+        start_time = datetime.datetime.now(tz=datetime.UTC)
         self.__vehicle_info_publisher.publish()
         self.vehicle_state.notify_car_activity()
 
@@ -236,7 +236,7 @@ class VehicleHandler:
     def __should_complete_configuration(self, start_time: datetime.datetime) -> bool:
         return (
             not self.vehicle_state.is_complete()
-            and datetime.datetime.now() > start_time + datetime.timedelta(seconds=10)
+            and datetime.datetime.now(tz=datetime.UTC) > start_time + datetime.timedelta(seconds=10)
         )
 
     def __refresh_openwb(

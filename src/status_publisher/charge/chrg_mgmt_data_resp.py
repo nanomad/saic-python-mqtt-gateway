@@ -79,7 +79,7 @@ class ChrgMgmtDataRespPublisher(
         if chrg_mgmt_data_result is not None or charge_status_result is not None:
             self._publish(
                 topic=mqtt_topics.REFRESH_LAST_CHARGE_STATE,
-                value=datetime.datetime.now(),
+                value=datetime.datetime.now(tz=datetime.UTC),
             )
         return ChrgMgmtDataRespProcessingResult(
             charge_current_limit=chrg_mgmt_data_result.charge_current_limit
