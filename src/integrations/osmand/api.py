@@ -64,6 +64,9 @@ class OsmAndApi:
             }
         )
 
+    async def close(self) -> None:
+        await self.client.aclose()
+
     async def update_osmand(
         self,
         vehicle_status: VehicleStatusResp | None,

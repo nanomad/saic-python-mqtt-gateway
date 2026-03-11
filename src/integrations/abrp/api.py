@@ -63,6 +63,9 @@ class AbrpApi:
             }
         )
 
+    async def close(self) -> None:
+        await self.client.aclose()
+
     async def update_abrp(
         self,
         vehicle_status: VehicleStatusResp | None,
