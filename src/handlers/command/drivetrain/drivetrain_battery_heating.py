@@ -23,12 +23,12 @@ class DrivetrainBatteryHeatingCommand(BooleanCommandHandler[ChrgPtcHeatResp]):
 
     @override
     async def handle_true(self) -> ChrgPtcHeatResp:
-        LOG.info("Battery heater wil be will be switched on")
+        LOG.info("Battery heater will be switched on")
         return await self.saic_api.control_battery_heating(self.vin, enable=True)
 
     @override
     async def handle_false(self) -> ChrgPtcHeatResp:
-        LOG.info("Battery heater wil be will be switched off")
+        LOG.info("Battery heater will be switched off")
         return await self.saic_api.control_battery_heating(self.vin, enable=False)
 
     @override
