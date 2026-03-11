@@ -10,7 +10,6 @@ readme = "README.md"
 
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 
@@ -33,15 +32,15 @@ package-mode = false
 requires-poetry = '>=2.0,<3.0'
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.2.2"
+pytest = "^9.0.0"
 mock = "^5.1.0"
 coverage = "^7.5.4"
-ruff = "^0.13.0"
+ruff = "^0.15.0"
 pytest-cov = "^7.0.0"
 pytest-asyncio = "^1.2.0"
 pytest-mock = "^3.14.0"
 mypy = "^1.15.0"
-pylint = "^3.3.6"
+pylint = "^4.0.0"
 
 [tool.poetry.dependencies]
 saic-ismart-client-ng = { develop = true }

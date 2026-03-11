@@ -49,7 +49,7 @@ class MessagePublisher(
                 self._transform_and_publish(
                     topic=mqtt_topics.INFO_LAST_MESSAGE_ID,
                     value=message.messageId,
-                    transform=lambda x: str(x),
+                    transform=str,
                 )
 
             self._publish(
