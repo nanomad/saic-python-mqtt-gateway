@@ -122,20 +122,20 @@ class OsmAndApi:
 
             try:
                 response = await self.client.post(url=self.__server_uri, params=data)
-                await response.aread()
+                response.raise_for_status()
                 return True, response.text
-            except httpx.ConnectError as ece:
-                msg = f"Connection error: {ece}"
-                raise OsmAndApiException(msg) from ece
-            except httpx.TimeoutException as et:
-                msg = f"Timeout error {et}"
-                raise OsmAndApiException(msg) from et
-            except httpx.RequestError as e:
-                msg = f"{e}"
+            except httpx.ConnectError as e:
+                msg = f"Connection error: {e}"
                 raise OsmAndApiException(msg) from e
-            except httpx.HTTPError as ehttp:
-                msg = f"HTTP error {ehttp}"
-                raise OsmAndApiException(msg) from ehttp
+            except httpx.TimeoutException as e:
+                msg = f"Timeout error: {e}"
+                raise OsmAndApiException(msg) from e
+            except httpx.HTTPStatusError as e:
+                msg = f"HTTP {e.response.status_code} error: {e}"
+                raise OsmAndApiException(msg) from e
+            except httpx.HTTPError as e:
+                msg = f"HTTP error: {e}"
+                raise OsmAndApiException(msg) from e
         else:
             return False, "OsmAnd request skipped because of missing configuration"
 
