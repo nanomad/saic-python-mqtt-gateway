@@ -142,7 +142,7 @@ class HomeAssistantDiscovery(HomeAssistantDiscoveryBase):
         self._publish_sensor(
             mqtt_topics.DRIVETRAIN_SOC_KWH,
             "SoC_kWh",
-            device_class="ENERGY_STORAGE",
+            device_class="energy_storage",
             state_class="measurement",
             unit_of_measurement="kWh",
             icon="mdi:battery-charging-70",
@@ -151,7 +151,7 @@ class HomeAssistantDiscovery(HomeAssistantDiscoveryBase):
             mqtt_topics.DRIVETRAIN_TOTAL_BATTERY_CAPACITY,
             "Total Battery Capacity",
             entity_category="diagnostic",
-            device_class="ENERGY_STORAGE",
+            device_class="energy_storage",
             state_class="measurement",
             unit_of_measurement="kWh",
             icon="mdi:battery-high",
@@ -160,7 +160,7 @@ class HomeAssistantDiscovery(HomeAssistantDiscoveryBase):
             mqtt_topics.DRIVETRAIN_TOTAL_BATTERY_CAPACITY,
             "Total Battery Capacity",
             entity_category="diagnostic",
-            device_class="ENERGY_STORAGE",
+            device_class="energy_storage",
             state_class="measurement",
             unit_of_measurement="kWh",
             icon="mdi:battery-high",
@@ -172,7 +172,7 @@ class HomeAssistantDiscovery(HomeAssistantDiscoveryBase):
         self._publish_sensor(
             mqtt_topics.DRIVETRAIN_LAST_CHARGE_ENDING_POWER,
             "Last Charge SoC kWh",
-            device_class="ENERGY_STORAGE",
+            device_class="energy_storage",
             state_class="measurement",
             unit_of_measurement="kWh",
             icon="mdi:battery-charging-70",
@@ -181,7 +181,7 @@ class HomeAssistantDiscovery(HomeAssistantDiscoveryBase):
             mqtt_topics.DRIVETRAIN_POWER_USAGE_SINCE_LAST_CHARGE,
             "Energy Usage Since Last Charge",
             enabled=False,
-            device_class="ENERGY_STORAGE",
+            device_class="energy_storage",
             state_class="measurement",
             unit_of_measurement="kWh",
             icon="mdi:battery-charging-70",
@@ -190,7 +190,7 @@ class HomeAssistantDiscovery(HomeAssistantDiscoveryBase):
             mqtt_topics.DRIVETRAIN_POWER_USAGE_OF_DAY,
             "Energy Usage of the Day",
             enabled=False,
-            device_class="ENERGY_STORAGE",
+            device_class="energy_storage",
             state_class="measurement",
             unit_of_measurement="kWh",
             icon="mdi:battery-charging-70",
@@ -457,14 +457,12 @@ class HomeAssistantDiscovery(HomeAssistantDiscoveryBase):
         self._publish_sensor(
             mqtt_topics.CCU_ONBOARD_PLUG_STATUS,
             "CCU Onboard Plug Status",
-            state_class="measurement",
             entity_category="diagnostic",
             enabled=False,
         )
         self._publish_sensor(
             mqtt_topics.CCU_OFFBOARD_PLUG_STATUS,
             "CCU Offboard Plug Status",
-            state_class="measurement",
             entity_category="diagnostic",
             enabled=False,
         )
@@ -745,7 +743,8 @@ class HomeAssistantDiscovery(HomeAssistantDiscoveryBase):
             {
                 "json_attributes_topic": self.__get_vehicle_topic(
                     mqtt_topics.LOCATION_POSITION
-                )
+                ),
+                "source_type": "gps",
             },
         )
 
