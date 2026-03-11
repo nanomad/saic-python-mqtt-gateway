@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from asyncio import Task
+import contextlib
 import datetime
 import logging
 from random import uniform
@@ -318,10 +319,8 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
             vh.vehicle_state.mark_failed_refresh()
             task = self.__cancel_vehicle_task(vin)
             if task is not None:
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await task
-                except asyncio.CancelledError:
-                    pass
             await vh.close()
 
     def __start_vehicle_task(self, vh: VehicleHandler) -> None:

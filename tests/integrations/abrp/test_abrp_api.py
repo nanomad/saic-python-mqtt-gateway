@@ -1,73 +1,107 @@
 from __future__ import annotations
 
-import unittest
+from typing import TYPE_CHECKING
 
 import httpx
+import pytest
+import pytest_asyncio
 
 from integrations.abrp.api import AbrpApi, AbrpApiException
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
+    from saic_ismart_client_ng.api.vehicle import VehicleStatusResp
+    from saic_ismart_client_ng.api.vehicle_charging import ChrgMgmtDataResp
 from tests.common_mocks import (
     get_mock_charge_management_data_resp,
     get_mock_vehicle_status_resp,
 )
 
-MOCK_API_KEY = "test_api_key"
-MOCK_USER_TOKEN = "test_user_token"
+
+@pytest.fixture
+def vehicle_status() -> VehicleStatusResp:
+    return get_mock_vehicle_status_resp()
 
 
-class TestAbrpApi(unittest.IsolatedAsyncioTestCase):
-    def setUp(self) -> None:
-        self.api = AbrpApi(
-            abrp_api_key=MOCK_API_KEY,
-            abrp_user_token=MOCK_USER_TOKEN,
+@pytest.fixture
+def charge_info() -> ChrgMgmtDataResp:
+    return get_mock_charge_management_data_resp()
+
+
+@pytest_asyncio.fixture
+async def abrp_api() -> AsyncIterator[AbrpApi]:
+    api = AbrpApi(
+        abrp_api_key="test_api_key",
+        abrp_user_token="test_user_token",  # noqa: S106
+    )
+    yield api
+    await api.close()
+
+
+async def _set_mock_transport(api: AbrpApi, status_code: int, text: str) -> None:
+    await api.client.aclose()
+    transport = httpx.MockTransport(
+        lambda _request: httpx.Response(status_code, text=text)
+    )
+    api.client = httpx.AsyncClient(transport=transport)
+
+
+@pytest.mark.asyncio
+async def test_raise_for_status_on_server_error(
+    abrp_api: AbrpApi,
+    vehicle_status: VehicleStatusResp,
+    charge_info: ChrgMgmtDataResp,
+) -> None:
+    await _set_mock_transport(abrp_api, 500, "Internal Server Error")
+
+    with pytest.raises(AbrpApiException, match="500"):
+        await abrp_api.update_abrp(
+            vehicle_status=vehicle_status,
+            charge_info=charge_info,
         )
-        self.vehicle_status = get_mock_vehicle_status_resp()
-        self.charge_info = get_mock_charge_management_data_resp()
 
-    async def asyncTearDown(self) -> None:
-        await self.api.close()
 
-    async def _set_mock_transport(self, status_code: int, text: str) -> None:
-        await self.api.client.aclose()
-        transport = httpx.MockTransport(
-            lambda request: httpx.Response(status_code, text=text)
+@pytest.mark.asyncio
+async def test_raise_for_status_on_client_error(
+    abrp_api: AbrpApi,
+    vehicle_status: VehicleStatusResp,
+    charge_info: ChrgMgmtDataResp,
+) -> None:
+    await _set_mock_transport(abrp_api, 403, "Forbidden")
+
+    with pytest.raises(AbrpApiException, match="403"):
+        await abrp_api.update_abrp(
+            vehicle_status=vehicle_status,
+            charge_info=charge_info,
         )
-        self.api.client = httpx.AsyncClient(transport=transport)
 
-    async def test_raise_for_status_on_server_error(self) -> None:
-        await self._set_mock_transport(500, "Internal Server Error")
 
-        with self.assertRaises(AbrpApiException) as ctx:
-            await self.api.update_abrp(
-                vehicle_status=self.vehicle_status,
-                charge_info=self.charge_info,
-            )
-        self.assertIn("500", str(ctx.exception))
+@pytest.mark.asyncio
+async def test_success_on_200(
+    abrp_api: AbrpApi,
+    vehicle_status: VehicleStatusResp,
+    charge_info: ChrgMgmtDataResp,
+) -> None:
+    await _set_mock_transport(abrp_api, 200, '{"status": "ok"}')
 
-    async def test_raise_for_status_on_client_error(self) -> None:
-        await self._set_mock_transport(403, "Forbidden")
+    success, response = await abrp_api.update_abrp(
+        vehicle_status=vehicle_status,
+        charge_info=charge_info,
+    )
+    assert success
+    assert response == '{"status": "ok"}'
 
-        with self.assertRaises(AbrpApiException) as ctx:
-            await self.api.update_abrp(
-                vehicle_status=self.vehicle_status,
-                charge_info=self.charge_info,
-            )
-        self.assertIn("403", str(ctx.exception))
 
-    async def test_success_on_200(self) -> None:
-        await self._set_mock_transport(200, '{"status": "ok"}')
-
-        success, response = await self.api.update_abrp(
-            vehicle_status=self.vehicle_status,
-            charge_info=self.charge_info,
-        )
-        self.assertTrue(success)
-        self.assertEqual(response, '{"status": "ok"}')
-
-    async def test_skips_when_missing_config(self) -> None:
-        api = AbrpApi(abrp_api_key=None, abrp_user_token=None)
-        success, _response = await api.update_abrp(
-            vehicle_status=self.vehicle_status,
-            charge_info=self.charge_info,
-        )
-        self.assertFalse(success)
-        await api.close()
+@pytest.mark.asyncio
+async def test_skips_when_missing_config(
+    vehicle_status: VehicleStatusResp,
+    charge_info: ChrgMgmtDataResp,
+) -> None:
+    api = AbrpApi(abrp_api_key=None, abrp_user_token=None)
+    success, _response = await api.update_abrp(
+        vehicle_status=vehicle_status,
+        charge_info=charge_info,
+    )
+    assert not success
+    await api.close()
