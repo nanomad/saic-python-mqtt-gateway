@@ -89,7 +89,8 @@ class MessageHandler:
     async def __get_all_alarm_messages(self) -> list[MessageEntity]:
         idx = 1
         all_messages = []
-        while True:
+        max_pages = 100
+        while idx <= max_pages:
             try:
                 message_list = await self.saicapi.get_alarm_list(
                     page_num=idx, page_size=1
@@ -108,16 +109,19 @@ class MessageHandler:
                     and oldest_message.message_time < self.last_message_ts
                 ):
                     return all_messages
-            except SaicLogoutException as e:
-                raise e
+            except SaicLogoutException:
+                raise
             except Exception as e:
                 LOG.exception(
                     "Error while fetching a message from the SAIC API, please open the app and clear them, "
                     "then report this as a bug.",
                     exc_info=e,
                 )
+                return all_messages
             finally:
                 idx = idx + 1
+        LOG.warning("Reached max page limit (%d) while fetching alarm messages", max_pages)
+        return all_messages
 
     async def __delete_message(self, message: MessageEntity) -> None:
         try:
