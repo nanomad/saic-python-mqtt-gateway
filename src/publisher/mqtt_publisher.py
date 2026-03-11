@@ -1,23 +1,43 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import ssl
-from typing import TYPE_CHECKING, Any, Final, cast, override
+from typing import TYPE_CHECKING, Any, override
 
-import gmqtt
+import aiomqtt
+from aiomqtt.exceptions import MqttConnectError
+from paho.mqtt.reasoncodes import ReasonCode
 
 import mqtt_topics
 from publisher.core import Publisher
 
 if TYPE_CHECKING:
-    from configuration import Configuration
+    from configuration import Configuration, QoS
     from integrations.openwb.charging_station import ChargingStation
 
 LOG = logging.getLogger(__name__)
 
+# MQTT CONNACK "Server unavailable" return codes — the only transient
+# connection refusal that warrants a retry. All other CONNACK refusal
+# codes (bad credentials, protocol mismatch, etc.) are fatal.
+_CONNACK_RC_SERVER_UNAVAILABLE_V311 = 3     # MQTT v3.1.1
+_CONNACK_RC_SERVER_UNAVAILABLE_V5 = 0x88    # MQTT v5
+
+
+def _is_transient_connect_error(rc: int | ReasonCode | None) -> bool:
+    if rc is None:
+        return False
+    if isinstance(rc, ReasonCode):
+        return rc.value == _CONNACK_RC_SERVER_UNAVAILABLE_V5
+    return rc == _CONNACK_RC_SERVER_UNAVAILABLE_V311
+
 
 class MqttPublisher(Publisher):
-    def __init__(self, configuration: Configuration) -> None:
+    def __init__(
+        self,
+        configuration: Configuration,
+    ) -> None:
         super().__init__(configuration)
         self.publisher_id = configuration.mqtt_client_id
         self.host = self.configuration.mqtt_host
@@ -27,113 +47,178 @@ class MqttPublisher(Publisher):
         self.last_charge_state_by_vin: dict[str, str] = {}
         self.vin_by_charger_connected_topic: dict[str, str] = {}
         self.first_connection = True
+        self.client: None | aiomqtt.Client = None
+        self.__running: asyncio.Task[None] | None = None
+        self.__connected = asyncio.Event()
 
-        mqtt_client = gmqtt.Client(
-            client_id=str(self.publisher_id),
-            transport=self.transport_protocol.transport_mechanism,
-            will_message=gmqtt.Message(
-                topic=self.get_topic(mqtt_topics.INTERNAL_LWT, False),
-                payload="offline",
-                retain=True,
-            ),
-        )
-        mqtt_client.on_connect = self.__on_connect
-        mqtt_client.on_message = self.__on_message
-        self.client: Final[gmqtt.Client] = mqtt_client
-
-    @override
-    async def connect(self) -> None:
-        if self.configuration.mqtt_user is not None:
-            if self.configuration.mqtt_password is not None:
-                self.client.set_auth_credentials(
-                    username=self.configuration.mqtt_user,
-                    password=self.configuration.mqtt_password,
-                )
-            else:
-                self.client.set_auth_credentials(username=self.configuration.mqtt_user)
-
+    async def __run_loop(self) -> None:
+        if not self.host:
+            msg = "MQTT host is not configured"
+            LOG.error(msg)
+            raise SystemExit(msg)
+        ssl_context: ssl.SSLContext | None = None
         if self.transport_protocol.with_tls:
             ssl_context = ssl.create_default_context()
-            cert_uri = self.configuration.tls_server_cert_path
-            if cert_uri:
-                LOG.debug(f"Using custom CA file {cert_uri}")
-                ssl_context.load_verify_locations(cafile=cert_uri)
+            if self.configuration.tls_server_cert_path:
+                LOG.debug(
+                    f"Using custom CA file {self.configuration.tls_server_cert_path}"
+                )
+                ssl_context.load_verify_locations(
+                    cafile=self.configuration.tls_server_cert_path
+                )
                 if not self.configuration.tls_server_cert_check_hostname:
                     LOG.warning(
                         f"Skipping hostname check for TLS connection to {self.host}"
                     )
-                    ssl_context.check_hostname = False
-        else:
-            ssl_context = None
-        await self.client.connect(
-            host=self.host,
-            port=self.port,
-            version=gmqtt.constants.MQTTv311,
-            ssl=ssl_context,
-        )
 
-    def __on_connect(
-        self, _client: Any, _flags: Any, rc: int, _properties: Any
-    ) -> None:
-        if rc == gmqtt.constants.CONNACK_ACCEPTED:
-            LOG.info("Connected to MQTT broker")
-            if not self.first_connection:
-                self.enable_commands()
-                if self.command_listener is not None:
-                    self.command_listener.on_mqtt_reconnected()
-            self.first_connection = False
-            self.keepalive()
-        else:
-            if rc == gmqtt.constants.CONNACK_REFUSED_BAD_USERNAME_PASSWORD:
-                LOG.error(
-                    f"MQTT connection error: bad username or password. Return code {rc}"
+        client = aiomqtt.Client(
+            hostname=self.host,
+            port=self.port,
+            identifier=str(self.publisher_id),
+            transport=self.transport_protocol.transport_mechanism,
+            username=self.configuration.mqtt_user or None,
+            password=self.configuration.mqtt_password or None,
+            clean_session=True,
+            tls_context=ssl_context,
+            tls_insecure=bool(
+                ssl_context and not self.configuration.tls_server_cert_check_hostname
+            ),
+            will=aiomqtt.Will(
+                topic=self.get_topic(mqtt_topics.INTERNAL_LWT, False),
+                payload="offline",
+                retain=True,
+                qos=1,
+            ),
+        )
+        client.pending_calls_threshold = 150
+        reconnect_interval = 5
+        while True:
+            try:
+                LOG.debug(
+                    "Connecting to %s:%s as %s",
+                    self.host,
+                    self.port,
+                    self.publisher_id,
                 )
-            elif rc == gmqtt.constants.CONNACK_REFUSED_PROTOCOL_VERSION:
-                LOG.error(
-                    f"MQTT connection error: refused protocol version. Return code {rc}"
+                async with client as client_context:
+                    self.client = client_context
+                    await self.__on_connect()
+                    self.__connected.set()
+                    async for message in client_context.messages:
+                        await self._on_message(
+                            client_context,
+                            str(message.topic),
+                            message.payload,
+                            message.qos,
+                            message.properties,
+                        )
+            except MqttConnectError as e:
+                if not _is_transient_connect_error(e.rc):
+                    LOG.error("Fatal MQTT connection error: %s", e)
+                    msg = f"Unable to connect to MQTT broker: {e}"
+                    raise SystemExit(msg) from e
+                LOG.warning(
+                    "Connection to %s:%s refused: %s; Reconnecting in %d seconds ...",
+                    self.host,
+                    self.port,
+                    e,
+                    reconnect_interval,
                 )
-            else:
-                LOG.error(f"MQTT connection error.Return code {rc}")
-            msg = f"Unable to connect to MQTT broker. Return code: {rc}"
-            raise SystemExit(msg)
+                await asyncio.sleep(reconnect_interval)
+            except aiomqtt.MqttError as e:
+                LOG.warning(
+                    "Connection to %s:%s lost: %s; Reconnecting in %d seconds ...",
+                    self.host,
+                    self.port,
+                    e,
+                    reconnect_interval,
+                )
+                await asyncio.sleep(reconnect_interval)
+            except asyncio.CancelledError:
+                LOG.debug("MQTT publisher loop cancelled")
+                raise
+            finally:
+                self.__connected.clear()
+                LOG.info("MQTT client disconnected")
+
+    @override
+    async def connect(self) -> None:
+        if self.__running and not self.__running.done():
+            LOG.warning("MQTT client is already running")
+            return
+        self.__running = asyncio.create_task(self.__run_loop())
+        # Wait for either a successful connection or the run loop to exit
+        # (e.g. due to missing host, fatal error, or unexpected exception)
+        connected_waiter = asyncio.create_task(self.__connected.wait())
+        done, _pending = await asyncio.wait(
+            {self.__running, connected_waiter},
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if connected_waiter not in done:
+            connected_waiter.cancel()
+        if self.__running in done:
+            # The run loop exited before connecting — propagate the error
+            self.__running.result()
+
+    async def __on_connect(self) -> None:
+        LOG.info("Connected to MQTT broker")
+        if not self.first_connection:
+            await self.__enable_commands()
+            if self.command_listener is not None:
+                self.command_listener.on_mqtt_reconnected()
+        self.first_connection = False
+        self.keepalive()
 
     @override
     def enable_commands(self) -> None:
-        LOG.info("Subscribing to MQTT command topics")
-        mqtt_account_prefix = self.get_mqtt_account_prefix()
-        self.client.subscribe(
-            f"{mqtt_account_prefix}/{mqtt_topics.VEHICLES}/+/+/+/{mqtt_topics.SET_SUFFIX}"
-        )
-        self.client.subscribe(
-            f"{mqtt_account_prefix}/{mqtt_topics.VEHICLES}/+/+/+/+/{mqtt_topics.SET_SUFFIX}"
-        )
-        self.client.subscribe(
-            f"{mqtt_account_prefix}/{mqtt_topics.VEHICLES}/+/{mqtt_topics.REFRESH_MODE}/{mqtt_topics.SET_SUFFIX}"
-        )
-        self.client.subscribe(
-            f"{mqtt_account_prefix}/{mqtt_topics.VEHICLES}/+/{mqtt_topics.REFRESH_PERIOD}/+/{mqtt_topics.SET_SUFFIX}"
-        )
-        for charging_station in self.configuration.charging_stations_by_vin.values():
-            LOG.debug(
-                f"Subscribing to MQTT topic {charging_station.charge_state_topic}"
-            )
-            self.vin_by_charge_state_topic[charging_station.charge_state_topic] = (
-                charging_station.vin
-            )
-            self.client.subscribe(charging_station.charge_state_topic)
-            if charging_station.connected_topic:
-                LOG.debug(
-                    f"Subscribing to MQTT topic {charging_station.connected_topic}"
-                )
-                self.vin_by_charger_connected_topic[
-                    charging_station.connected_topic
-                ] = charging_station.vin
-                self.client.subscribe(charging_station.connected_topic)
-        if self.configuration.ha_discovery_enabled:
-            # enable dynamic discovery pushing in case ha reconnects
-            self.client.subscribe(self.configuration.ha_lwt_topic)
+        task = asyncio.create_task(self.__enable_commands())
+        task.add_done_callback(self.__handle_task_exception)
 
-    async def __on_message(
+    async def __enable_commands(self) -> None:
+        if not self.client:
+            LOG.error("Failed to enable commands: MQTT client is not connected")
+            return
+        try:
+            LOG.info("Subscribing to MQTT command topics")
+            mqtt_account_prefix = self.get_mqtt_account_prefix()
+            await self.client.subscribe(
+                f"{mqtt_account_prefix}/{mqtt_topics.VEHICLES}/+/+/+/{mqtt_topics.SET_SUFFIX}"
+            )
+            await self.client.subscribe(
+                f"{mqtt_account_prefix}/{mqtt_topics.VEHICLES}/+/+/+/+/{mqtt_topics.SET_SUFFIX}"
+            )
+            await self.client.subscribe(
+                f"{mqtt_account_prefix}/{mqtt_topics.VEHICLES}/+/{mqtt_topics.REFRESH_MODE}/{mqtt_topics.SET_SUFFIX}"
+            )
+            await self.client.subscribe(
+                f"{mqtt_account_prefix}/{mqtt_topics.VEHICLES}/+/{mqtt_topics.REFRESH_PERIOD}/+/{mqtt_topics.SET_SUFFIX}"
+            )
+            for (
+                charging_station
+            ) in self.configuration.charging_stations_by_vin.values():
+                LOG.debug(
+                    f"Subscribing to MQTT topic {charging_station.charge_state_topic}"
+                )
+                self.vin_by_charge_state_topic[charging_station.charge_state_topic] = (
+                    charging_station.vin
+                )
+                await self.client.subscribe(charging_station.charge_state_topic)
+                if charging_station.connected_topic:
+                    LOG.debug(
+                        f"Subscribing to MQTT topic {charging_station.connected_topic}"
+                    )
+                    self.vin_by_charger_connected_topic[
+                        charging_station.connected_topic
+                    ] = charging_station.vin
+                    await self.client.subscribe(charging_station.connected_topic)
+            if self.configuration.ha_discovery_enabled:
+                # enable dynamic discovery pushing in case ha reconnects
+                await self.client.subscribe(self.configuration.ha_lwt_topic)
+        except aiomqtt.MqttError as e:
+            LOG.error("Failed to subscribe to MQTT command topics: %s", e)
+            raise
+
+    async def _on_message(
         self, _client: Any, topic: str, payload: Any, _qos: Any, _properties: Any
     ) -> None:
         try:
@@ -180,39 +265,112 @@ class MqttPublisher(Publisher):
                     vin=vin, topic=topic, payload=payload
                 )
 
-    def __publish(self, topic: str, payload: Any) -> None:
-        self.client.publish(topic, payload, retain=True)
+    def __publish(
+        self, topic: str, payload: Any, retain: bool = True, qos: QoS = 0
+    ) -> None:
+        LOG.debug("Publishing to MQTT topic %s with payload %s", topic, payload)
+        task = asyncio.create_task(
+            self.__async_publish(topic, payload, retain=retain, qos=qos)
+        )
+        task.add_done_callback(self.__handle_task_exception)
+
+    async def __async_publish(
+        self, topic: str, payload: Any, retain: bool, qos: QoS
+    ) -> None:
+        if not (self.client and self.is_connected()):
+            LOG.error("Failed to publish: MQTT client is not connected")
+            return
+        try:
+            await self.client.publish(topic, payload, retain=retain, qos=qos)
+        except aiomqtt.MqttError as e:
+            LOG.error(
+                f"Failed to publish to MQTT topic {topic} with payload {payload}: {e}"
+            )
+
+    @staticmethod
+    def __handle_task_exception(task: asyncio.Task[None]) -> None:
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc is not None:
+            LOG.error("Background MQTT task failed: %s", exc)
 
     @override
     def is_connected(self) -> bool:
-        return cast("bool", self.client.is_connected)
+        return self.__connected.is_set()
 
     @override
     def publish_json(
-        self, key: str, data: dict[str, Any], no_prefix: bool = False
+        self,
+        key: str,
+        data: dict[str, Any],
+        no_prefix: bool = False,
+        retain: bool = True,
+        qos: QoS = 0,
     ) -> None:
         payload = self.dict_to_anonymized_json(data)
-        self.__publish(topic=self.get_topic(key, no_prefix), payload=payload)
+        self.__publish(
+            topic=self.get_topic(key, no_prefix),
+            payload=payload,
+            retain=retain,
+            qos=qos,
+        )
 
     @override
-    def publish_str(self, key: str, value: str, no_prefix: bool = False) -> None:
-        self.__publish(topic=self.get_topic(key, no_prefix), payload=value)
+    def publish_str(
+        self,
+        key: str,
+        value: str,
+        no_prefix: bool = False,
+        retain: bool = True,
+        qos: QoS = 0,
+    ) -> None:
+        self.__publish(
+            topic=self.get_topic(key, no_prefix), payload=value, retain=retain, qos=qos
+        )
 
     @override
-    def publish_int(self, key: str, value: int, no_prefix: bool = False) -> None:
-        self.__publish(topic=self.get_topic(key, no_prefix), payload=value)
+    def publish_int(
+        self,
+        key: str,
+        value: int,
+        no_prefix: bool = False,
+        retain: bool = True,
+        qos: QoS = 0,
+    ) -> None:
+        self.__publish(
+            topic=self.get_topic(key, no_prefix), payload=value, retain=retain, qos=qos
+        )
 
     @override
-    def publish_bool(self, key: str, value: bool, no_prefix: bool = False) -> None:
-        self.__publish(topic=self.get_topic(key, no_prefix), payload=value)
+    def publish_bool(
+        self,
+        key: str,
+        value: bool,
+        no_prefix: bool = False,
+        retain: bool = True,
+        qos: QoS = 0,
+    ) -> None:
+        self.__publish(
+            topic=self.get_topic(key, no_prefix), payload=value, retain=retain, qos=qos
+        )
 
     @override
-    def publish_float(self, key: str, value: float, no_prefix: bool = False) -> None:
-        self.__publish(topic=self.get_topic(key, no_prefix), payload=value)
+    def publish_float(
+        self,
+        key: str,
+        value: float,
+        no_prefix: bool = False,
+        retain: bool = True,
+        qos: QoS = 0,
+    ) -> None:
+        self.__publish(
+            topic=self.get_topic(key, no_prefix), payload=value, retain=retain, qos=qos
+        )
 
     @override
-    def clear_topic(self, key: str, no_prefix: bool = False) -> None:
-        self.__publish(topic=self.get_topic(key, no_prefix), payload=None)
+    def clear_topic(self, key: str, no_prefix: bool = False, qos: QoS = 0) -> None:
+        self.__publish(topic=self.get_topic(key, no_prefix), payload=None, qos=qos)
 
     def get_vin_from_topic(self, topic: str) -> str:
         global_topic_removed = topic[len(self.configuration.mqtt_topic) + 1 :]
