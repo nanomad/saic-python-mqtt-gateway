@@ -743,7 +743,8 @@ class HomeAssistantDiscovery(HomeAssistantDiscoveryBase):
             {
                 "json_attributes_topic": self.__get_vehicle_topic(
                     mqtt_topics.LOCATION_POSITION
-                )
+                ),
+                "source_type": "gps",
             },
         )
 
