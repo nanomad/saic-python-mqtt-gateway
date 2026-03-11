@@ -146,8 +146,6 @@ class Publisher(ABC):
                             | "event-id"
                             | "event_id"
                             | "eventId"
-                            | "event_id"
-                            | "eventID"
                             | "lastKeySeen"
                         ):
                             data[key] = 9999
@@ -170,8 +168,10 @@ class Publisher(ABC):
         return re.sub("[1-9]", "9", r)
 
     def anonymize_device_id(self, device_id: str) -> str:
-        elements = device_id.split("###")
-        return f"{self.anonymize_str(elements[0])}###{self.anonymize_str(elements[1])}"
+        elements = device_id.split("###", maxsplit=1)
+        if len(elements) == 2:
+            return f"{self.anonymize_str(elements[0])}###{self.anonymize_str(elements[1])}"
+        return self.anonymize_str(device_id)
 
     @staticmethod
     def anonymize_int(value: int) -> int:

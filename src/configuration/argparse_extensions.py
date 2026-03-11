@@ -83,9 +83,7 @@ def cfg_value_to_dict(
 
     for entry in map_entries:
         if "=" in entry:
-            key_value_pair = entry.split("=")
-            key = key_value_pair[0]
-            value = key_value_pair[1]
+            key, value = entry.split("=", maxsplit=1)
             result_map[key] = value_type(value)
 
 
