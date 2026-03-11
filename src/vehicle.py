@@ -84,13 +84,13 @@ class VehicleState:
         )
         self.vehicle: Final[VehicleInfo] = vin_info
         self.mqtt_vin_prefix = account_prefix
-        self.last_car_activity: datetime.datetime = datetime.datetime.min
-        self.last_successful_refresh: datetime.datetime = datetime.datetime.min
+        self.last_car_activity: datetime.datetime = datetime.datetime.min.replace(tzinfo=datetime.UTC)
+        self.last_successful_refresh: datetime.datetime = datetime.datetime.min.replace(tzinfo=datetime.UTC)
         self.__last_failed_refresh: datetime.datetime | None = None
         self.__failed_refresh_counter = 0
         self.__refresh_period_error = 30
-        self.last_car_shutdown: datetime.datetime = datetime.datetime.now()
-        self.last_car_vehicle_message: datetime.datetime = datetime.datetime.min
+        self.last_car_shutdown: datetime.datetime = datetime.datetime.now(tz=datetime.UTC)
+        self.last_car_vehicle_message: datetime.datetime = datetime.datetime.min.replace(tzinfo=datetime.UTC)
         # treat high voltage battery as active, if we don't have any other information
         self.__hv_battery_active = True
         self.__hv_battery_active_from_car = True
@@ -306,14 +306,14 @@ class VehicleState:
     def hv_battery_active_from_car(self, new_state: bool) -> None:
         old_state = self.__hv_battery_active_from_car
         if old_state and not new_state:
-            self.last_car_shutdown = datetime.datetime.now()
+            self.last_car_shutdown = datetime.datetime.now(tz=datetime.UTC)
             LOG.info(
                 f"Detected vehicle {self.vin} shutdown at {self.last_car_shutdown}"
             )
         self.__hv_battery_active_from_car = new_state
 
     def notify_car_activity(self) -> None:
-        self.last_car_activity = datetime.datetime.now()
+        self.last_car_activity = datetime.datetime.now(tz=datetime.UTC)
         self.__publish(
             topic=mqtt_topics.REFRESH_LAST_ACTIVITY,
             value=datetime_to_str(self.last_car_activity),
@@ -355,7 +355,7 @@ class VehicleState:
             )
             return True
         if self.last_failed_refresh is not None:
-            threshold = datetime.datetime.now() - datetime.timedelta(
+            threshold = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(
                 seconds=float(self.refresh_period_error)
             )
             result: bool = self.last_failed_refresh < threshold
@@ -364,7 +364,7 @@ class VehicleState:
         if self.is_charging and self.refresh_period_charging > 0:
             result = (
                 self.last_successful_refresh
-                < datetime.datetime.now()
+                < datetime.datetime.now(tz=datetime.UTC)
                 - datetime.timedelta(seconds=float(self.refresh_period_charging))
             )
             LOG.debug(f"HV battery is charging. Should refresh: {result}")
@@ -372,7 +372,7 @@ class VehicleState:
         if self.hv_battery_active:
             result = (
                 self.last_successful_refresh
-                < datetime.datetime.now()
+                < datetime.datetime.now(tz=datetime.UTC)
                 - datetime.timedelta(seconds=float(self.refresh_period_active))
             )
             LOG.debug(f"HV battery is active. Should refresh: {result}")
@@ -380,10 +380,10 @@ class VehicleState:
         last_shutdown_plus_refresh = self.last_car_shutdown + datetime.timedelta(
             seconds=float(self.refresh_period_inactive_grace)
         )
-        if last_shutdown_plus_refresh > datetime.datetime.now():
+        if last_shutdown_plus_refresh > datetime.datetime.now(tz=datetime.UTC):
             result = (
                 self.last_successful_refresh
-                < datetime.datetime.now()
+                < datetime.datetime.now(tz=datetime.UTC)
                 - datetime.timedelta(seconds=float(self.refresh_period_after_shutdown))
             )
             LOG.debug(
@@ -392,7 +392,7 @@ class VehicleState:
             return result
         result = (
             self.last_successful_refresh
-            < datetime.datetime.now()
+            < datetime.datetime.now(tz=datetime.UTC)
             - datetime.timedelta(seconds=float(self.refresh_period_inactive))
         )
         LOG.debug(
@@ -401,12 +401,12 @@ class VehicleState:
         return result
 
     def mark_successful_refresh(self) -> None:
-        self.last_successful_refresh = datetime.datetime.now()
+        self.last_successful_refresh = datetime.datetime.now(tz=datetime.UTC)
         self.last_failed_refresh = None
         self.publisher.publish_str(self.get_topic(mqtt_topics.AVAILABLE), "online")
 
     def mark_failed_refresh(self) -> None:
-        self.last_failed_refresh = datetime.datetime.now()
+        self.last_failed_refresh = datetime.datetime.now(tz=datetime.UTC)
         self.publisher.publish_str(self.get_topic(mqtt_topics.AVAILABLE), "offline")
 
     @property
