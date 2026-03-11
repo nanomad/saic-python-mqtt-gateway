@@ -339,6 +339,7 @@ class VehicleHandler:
 
 
 class VehicleHandlerLocator(ABC):
+    @abstractmethod
     def get_vehicle_handler(self, vin: str) -> VehicleHandler | None:
         raise NotImplementedError
 

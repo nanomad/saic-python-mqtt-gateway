@@ -27,10 +27,10 @@ def test_all_commands_should_have_a_valid_topic(
 
 
 def test_there_should_be_no_duplicate_command_names() -> None:
-    discovered_names = [x.name for x in ALL_COMMAND_HANDLERS]
+    discovered_names = [x.name() for x in ALL_COMMAND_HANDLERS]
     assert len(discovered_names) == len(set(discovered_names))
 
 
 def test_there_should_be_no_duplicate_command_topics() -> None:
-    discovered_names = [x.topic for x in ALL_COMMAND_HANDLERS]
+    discovered_names = [x.topic() for x in ALL_COMMAND_HANDLERS]
     assert len(discovered_names) == len(set(discovered_names))

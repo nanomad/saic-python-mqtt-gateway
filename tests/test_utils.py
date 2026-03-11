@@ -105,10 +105,6 @@ class Test(TestCase):
 
         result = get_update_timestamp(vehicle_status_resp)
 
-        assert int(result.timestamp()) is not None, (
-            "This test should have returned a timestamp"
-        )
-
         assert result <= datetime.datetime.now(tz=datetime.UTC)
 
     def test_get_update_should_return_now_if_no_other_info_is_there_v3(self) -> None:
@@ -120,9 +116,5 @@ class Test(TestCase):
         )
 
         result = get_update_timestamp(vehicle_status_resp)
-
-        assert int(result.timestamp()) is not None, (
-            "This test should have returned a timestamp"
-        )
 
         assert result <= datetime.datetime.now(tz=datetime.UTC)
