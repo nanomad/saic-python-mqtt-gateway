@@ -620,11 +620,11 @@ class VehicleState:
         elif not self.is_charging:
             # Reset the charging refresh period if we detected we are no longer charging
             self.set_refresh_period_charging(0)
-        else:
-            # Otherwise let's keep the last computed refresh period
-            # This avoids falling back to the active refresh period which, being too often, results in a ban from
-            # the SAIC API
-            pass
+        elif self.refresh_period_charging < self.refresh_period_after_shutdown:
+            # Charging with insignificant power (< 1kW, e.g. OBC trickle/maintenance).
+            # Use at least the after-shutdown period to avoid polling at the active rate (30s)
+            # indefinitely, which wastes API quota and can drain the 12V battery.
+            self.set_refresh_period_charging(self.refresh_period_after_shutdown)
 
         return result
 
