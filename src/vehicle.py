@@ -118,7 +118,8 @@ class VehicleState:
         # treat high voltage battery as active, if we don't have any other information
         self.__hv_battery_active = True
         self.__hv_battery_active_from_car = True
-        self.is_charging = False
+        self.__is_charging = False
+        self.__had_significant_charging_power = False
         self.refresh_period_active = -1
         self.refresh_period_inactive = -1
         self.refresh_period_after_shutdown = -1
@@ -284,6 +285,24 @@ class VehicleState:
             and self.refresh_period_inactive_grace != -1
             and self.refresh_mode is not None
         )
+
+    @property
+    def is_charging(self) -> bool:
+        return self.__is_charging
+
+    @is_charging.setter
+    def is_charging(self, new_state: bool) -> None:
+        old_state = self.__is_charging
+        if old_state and not new_state and self.__had_significant_charging_power:
+            self.last_car_shutdown = datetime.datetime.now(tz=datetime.UTC)
+            LOG.info(
+                "Charging stopped for vehicle %s, resetting last_car_shutdown to %s",
+                self.vin,
+                self.last_car_shutdown,
+            )
+        if not new_state:
+            self.__had_significant_charging_power = False
+        self.__is_charging = new_state
 
     def set_is_charging(self, is_charging: bool) -> None:
         self.is_charging = is_charging
@@ -578,6 +597,8 @@ class VehicleState:
         self.is_charging = result.is_charging or False
 
         if self.is_charging and result.power is not None and result.power < -1:
+            # Mark that we've seen significant charging power (> 1kW)
+            self.__had_significant_charging_power = True
             # Only compute a dynamic refresh period if we have detected at least 1kW of power during charging
             time_for_1pct = (
                 36.0 * result.real_total_battery_capacity / abs(result.power)
@@ -599,11 +620,11 @@ class VehicleState:
         elif not self.is_charging:
             # Reset the charging refresh period if we detected we are no longer charging
             self.set_refresh_period_charging(0)
-        else:
-            # Otherwise let's keep the last computed refresh period
-            # This avoids falling back to the active refresh period which, being too often, results in a ban from
-            # the SAIC API
-            pass
+        elif self.refresh_period_charging < self.refresh_period_after_shutdown:
+            # Charging with insignificant power (< 1kW, e.g. OBC trickle/maintenance).
+            # Use at least the after-shutdown period to avoid polling at the active rate (30s)
+            # indefinitely, which wastes API quota and can drain the 12V battery.
+            self.set_refresh_period_charging(self.refresh_period_after_shutdown)
 
         return result
 

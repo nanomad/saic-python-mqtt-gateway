@@ -20,7 +20,7 @@ from saic_ismart_client_ng.api.vehicle_charging.schema import (
 from configuration import Configuration
 from exceptions import VehicleStatusDriftException
 import mqtt_topics
-from vehicle import RefreshMode, VehicleState
+from vehicle import PollingPhase, RefreshMode, VehicleState
 from vehicle_info import VehicleInfo
 
 from .common_mocks import (
@@ -334,6 +334,156 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
         self.assert_mqtt_topic(
             self.get_topic(mqtt_topics.DRIVETRAIN_MILEAGE_OF_DAY),
             DRIVETRAIN_MILEAGE_OF_DAY,
+        )
+
+    def test_is_charging_true_to_false_resets_last_car_shutdown(self) -> None:
+        """When is_charging transitions True -> False after significant power, last_car_shutdown is updated."""
+        old_shutdown = self.vehicle_state.last_car_shutdown
+        self.vehicle_state.is_charging = True
+        # Simulate significant charging power detected via handle_charge_status
+        self.vehicle_state._VehicleState__had_significant_charging_power = True
+        self.vehicle_state.is_charging = False
+        assert self.vehicle_state.last_car_shutdown > old_shutdown
+
+    def test_is_charging_true_to_false_without_significant_power_does_not_reset(
+        self,
+    ) -> None:
+        """When is_charging transitions True -> False without significant power, no reset."""
+        old_shutdown = self.vehicle_state.last_car_shutdown
+        self.vehicle_state.is_charging = True
+        # No significant power flag set (e.g. OBC trickle)
+        self.vehicle_state.is_charging = False
+        assert self.vehicle_state.last_car_shutdown == old_shutdown
+
+    def test_is_charging_false_to_false_does_not_reset_last_car_shutdown(self) -> None:
+        """When is_charging stays False, last_car_shutdown is not updated."""
+        old_shutdown = self.vehicle_state.last_car_shutdown
+        self.vehicle_state.is_charging = False
+        assert self.vehicle_state.last_car_shutdown == old_shutdown
+
+    def test_is_charging_true_to_true_does_not_reset_last_car_shutdown(self) -> None:
+        """When is_charging stays True, last_car_shutdown is not updated."""
+        self.vehicle_state.is_charging = True
+        old_shutdown = self.vehicle_state.last_car_shutdown
+        self.vehicle_state.is_charging = True
+        assert self.vehicle_state.last_car_shutdown == old_shutdown
+
+    def test_should_refresh_off_publishes_off_phase(self) -> None:
+        self.vehicle_state.configure_missing()
+        self.vehicle_state.set_refresh_mode(RefreshMode.OFF, "test")
+        self.publisher.map.clear()
+        result = self.vehicle_state.should_refresh()
+        assert result is False
+        self.assert_mqtt_topic(
+            self.get_topic(mqtt_topics.REFRESH_POLLING_PHASE),
+            PollingPhase.OFF.value,
+        )
+
+    def test_should_refresh_force_publishes_force_phase(self) -> None:
+        self.vehicle_state.configure_missing()
+        self.vehicle_state.set_refresh_mode(RefreshMode.FORCE, "test")
+        self.publisher.map.clear()
+        result = self.vehicle_state.should_refresh()
+        assert result is True
+        self.assert_mqtt_topic(
+            self.get_topic(mqtt_topics.REFRESH_POLLING_PHASE),
+            PollingPhase.FORCE.value,
+        )
+
+    def test_should_refresh_charging_detection_resets_shutdown(self) -> None:
+        self.vehicle_state.configure_missing()
+        old_shutdown = self.vehicle_state.last_car_shutdown
+        self.vehicle_state.set_refresh_mode(RefreshMode.CHARGING_DETECTION, "test")
+        self.publisher.map.clear()
+        result = self.vehicle_state.should_refresh()
+        assert result is True
+        assert self.vehicle_state.last_car_shutdown >= old_shutdown
+        self.assert_mqtt_topic(
+            self.get_topic(mqtt_topics.REFRESH_POLLING_PHASE),
+            PollingPhase.CHARGING_DETECTION.value,
+        )
+
+    def test_should_refresh_charging_detection_reverts_to_previous(self) -> None:
+        self.vehicle_state.configure_missing()
+        # Previous mode is PERIODIC (set by configure_missing)
+        self.vehicle_state.set_refresh_mode(RefreshMode.CHARGING_DETECTION, "test")
+        self.vehicle_state.should_refresh()
+        assert self.vehicle_state.refresh_mode == RefreshMode.PERIODIC
+
+    def test_should_refresh_charging_detection_from_off_reverts_to_off(self) -> None:
+        self.vehicle_state.configure_missing()
+        self.vehicle_state.set_refresh_mode(RefreshMode.OFF, "test")
+        self.vehicle_state.set_refresh_mode(RefreshMode.CHARGING_DETECTION, "test")
+        self.vehicle_state.should_refresh()
+        assert self.vehicle_state.refresh_mode == RefreshMode.OFF
+
+    def test_periodic_inactive_publishes_inactive_phase(self) -> None:
+        self.vehicle_state.configure_missing()
+        # Ensure the car is inactive and grace period has passed
+        self.vehicle_state.hv_battery_active = False
+        self.vehicle_state.last_car_shutdown = datetime.datetime.min.replace(
+            tzinfo=datetime.UTC
+        )
+        self.vehicle_state.last_car_activity = datetime.datetime.min.replace(
+            tzinfo=datetime.UTC
+        )
+        self.vehicle_state.last_successful_refresh = datetime.datetime.now(
+            tz=datetime.UTC
+        )
+        self.publisher.map.clear()
+        result = self.vehicle_state.should_refresh()
+        assert result is False
+        self.assert_mqtt_topic(
+            self.get_topic(mqtt_topics.REFRESH_POLLING_PHASE),
+            PollingPhase.INACTIVE.value,
+        )
+
+    def test_periodic_after_shutdown_publishes_after_shutdown_phase(self) -> None:
+        self.vehicle_state.configure_missing()
+        # Car just shut down, grace period active
+        self.vehicle_state.hv_battery_active = False
+        self.vehicle_state.last_car_shutdown = datetime.datetime.now(
+            tz=datetime.UTC
+        )
+        self.vehicle_state.last_car_activity = datetime.datetime.min.replace(
+            tzinfo=datetime.UTC
+        )
+        self.vehicle_state.last_successful_refresh = datetime.datetime.now(
+            tz=datetime.UTC
+        )
+        self.publisher.map.clear()
+        result = self.vehicle_state.should_refresh()
+        # Should not refresh yet (just refreshed) but phase should be after_shutdown
+        assert result is False
+        self.assert_mqtt_topic(
+            self.get_topic(mqtt_topics.REFRESH_POLLING_PHASE),
+            PollingPhase.AFTER_SHUTDOWN.value,
+        )
+
+    def test_charging_stop_triggers_after_shutdown_grace(self) -> None:
+        """End-to-end: charging stops -> last_car_shutdown resets -> after_shutdown phase."""
+        self.vehicle_state.configure_missing()
+        # Car is parked (off), only charging keeps it "active"
+        self.vehicle_state.hv_battery_active = False
+        self.vehicle_state.is_charging = True
+        self.vehicle_state._VehicleState__had_significant_charging_power = True
+        self.vehicle_state.hv_battery_active = True
+        # Simulate a recent successful refresh
+        self.vehicle_state.last_successful_refresh = datetime.datetime.now(
+            tz=datetime.UTC
+        )
+        self.vehicle_state.last_car_activity = datetime.datetime.min.replace(
+            tzinfo=datetime.UTC
+        )
+        # Charging stops (e.g. phase switch) — car itself is off
+        self.vehicle_state.is_charging = False
+        self.vehicle_state.hv_battery_active = False
+        self.publisher.map.clear()
+        self.vehicle_state.should_refresh()
+        # Grace period is now active, phase should be after_shutdown
+        self.assert_mqtt_topic(
+            self.get_topic(mqtt_topics.REFRESH_POLLING_PHASE),
+            PollingPhase.AFTER_SHUTDOWN.value,
         )
 
     @staticmethod
