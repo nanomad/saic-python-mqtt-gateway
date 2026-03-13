@@ -54,8 +54,8 @@ def _make_integration(
         charging_value=CHARGING_VALUE,
         soc_topic=soc_topic,
         soc_ts_topic=soc_ts_topic,
+        range_topic=RANGE_TOPIC,
     )
-    charging_station.range_topic = RANGE_TOPIC
     return OpenWBIntegration(
         charging_station=charging_station,
         publisher=publisher,
