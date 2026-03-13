@@ -86,3 +86,13 @@ class TestMqttPublisher(unittest.IsolatedAsyncioTestCase, MqttCommandListener):
 
     async def on_charging_detected(self, vin: str) -> None:
         pass
+
+    async def on_charging_station_energy_imported(
+        self, vin: str, imported_energy_wh: float
+    ) -> None:
+        pass
+
+    async def on_charger_connection_state_changed(
+        self, vin: str, connected: bool
+    ) -> None:
+        pass

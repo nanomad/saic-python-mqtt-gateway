@@ -210,6 +210,30 @@ class TestImportedEnergyRefresh(unittest.TestCase):
         )
         assert not result
 
+    def test_zero_battery_capacity_returns_false(self) -> None:
+        result = self.integration.should_refresh_by_imported_energy(
+            imported_energy_wh=1000.0,
+            battery_capacity_kwh=0.0,
+            charge_polling_min_percent=CHARGE_POLLING_MIN_PERCENT,
+        )
+        assert not result
+
+    def test_negative_battery_capacity_returns_false(self) -> None:
+        result = self.integration.should_refresh_by_imported_energy(
+            imported_energy_wh=1000.0,
+            battery_capacity_kwh=-1.0,
+            charge_polling_min_percent=CHARGE_POLLING_MIN_PERCENT,
+        )
+        assert not result
+
+    def test_zero_polling_percent_returns_false(self) -> None:
+        result = self.integration.should_refresh_by_imported_energy(
+            imported_energy_wh=1000.0,
+            battery_capacity_kwh=BATTERY_CAPACITY_KWH,
+            charge_polling_min_percent=0.0,
+        )
+        assert not result
+
     def test_first_call_initializes_threshold(self) -> None:
         assert not self._should_refresh(1000.0)
 
@@ -237,6 +261,11 @@ class TestImportedEnergyRefresh(unittest.TestCase):
         assert not self._should_refresh(0.0)
         # New threshold from 0
         assert self._should_refresh(float(ENERGY_THRESHOLD))
+
+    def test_unknown_charger_state_allows_energy_check(self) -> None:
+        """Energy check proceeds when charger connection state is unknown (no topic configured)."""
+        assert not self._should_refresh(1000.0)  # initializes
+        assert self._should_refresh(1000.0 + ENERGY_THRESHOLD)  # triggers
 
     def test_charger_disconnected_skips_check(self) -> None:
         self.integration.set_charger_connection_state(False)

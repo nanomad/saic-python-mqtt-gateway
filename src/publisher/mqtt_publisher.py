@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import ssl
 from typing import TYPE_CHECKING, Any, Final, cast, override
 
@@ -183,21 +184,7 @@ class MqttPublisher(Publisher):
                     vin, connected
                 )
         elif topic in self.vin_by_imported_energy_topic:
-            LOG.debug(f"Received message over topic {topic} with payload {payload}")
-            vin = self.vin_by_imported_energy_topic[topic]
-            try:
-                imported_energy_wh = float(payload)
-            except (ValueError, TypeError):
-                LOG.warning(
-                    "Invalid imported energy payload '%s' for topic %s, expected a number",
-                    payload,
-                    topic,
-                )
-                return
-            if self.command_listener is not None:
-                await self.command_listener.on_charging_station_energy_imported(
-                    vin, imported_energy_wh
-                )
+            await self.__handle_imported_energy(topic, payload)
         elif topic == self.configuration.ha_lwt_topic:
             if self.command_listener is not None:
                 await self.command_listener.on_mqtt_global_command_received(
@@ -209,6 +196,30 @@ class MqttPublisher(Publisher):
                 await self.command_listener.on_mqtt_command_received(
                     vin=vin, topic=topic, payload=payload
                 )
+
+    async def __handle_imported_energy(self, topic: str, payload: str) -> None:
+        LOG.debug(f"Received message over topic {topic} with payload {payload}")
+        vin = self.vin_by_imported_energy_topic[topic]
+        try:
+            imported_energy_wh = float(payload)
+        except (ValueError, TypeError):
+            LOG.warning(
+                "Invalid imported energy payload '%s' for topic %s, expected a number",
+                payload,
+                topic,
+            )
+            return
+        if not math.isfinite(imported_energy_wh):
+            LOG.warning(
+                "Non-finite imported energy value '%s' for topic %s, ignoring",
+                payload,
+                topic,
+            )
+            return
+        if self.command_listener is not None:
+            await self.command_listener.on_charging_station_energy_imported(
+                vin, imported_energy_wh
+            )
 
     def __publish(self, topic: str, payload: Any) -> None:
         self.client.publish(topic, payload, retain=True)

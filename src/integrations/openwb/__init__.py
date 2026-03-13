@@ -97,9 +97,17 @@ class OpenWBIntegration:
             LOG.debug("Charger is disconnected, skipping imported energy check")
             return False
 
-        if battery_capacity_kwh is None:
+        if battery_capacity_kwh is None or battery_capacity_kwh <= 0:
             LOG.warning(
-                "Battery capacity not available, cannot calculate energy threshold"
+                "Battery capacity not available or invalid, cannot calculate energy threshold"
+            )
+            return False
+
+        if charge_polling_min_percent <= 0:
+            LOG.warning(
+                "charge_polling_min_percent is %.2f, must be positive; "
+                "skipping energy threshold check",
+                charge_polling_min_percent,
             )
             return False
 
