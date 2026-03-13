@@ -56,12 +56,36 @@ LOG = logging.getLogger(__name__)
 @unique
 class RefreshMode(Enum):
     FORCE = "force"
+    CHARGING_DETECTION = "charging_detection"
     OFF = "off"
     PERIODIC = "periodic"
 
     @staticmethod
     def get(mode: str) -> RefreshMode:
         return RefreshMode[mode.upper()]
+
+
+#: One-shot refresh modes that trigger a single refresh and revert to the previous mode.
+ONE_SHOT_REFRESH_MODES: Final[frozenset[RefreshMode]] = frozenset(
+    {RefreshMode.FORCE, RefreshMode.CHARGING_DETECTION}
+)
+
+#: Refresh modes that are not valid at startup and must be replaced with PERIODIC.
+INVALID_STARTUP_REFRESH_MODES: Final[frozenset[RefreshMode]] = frozenset(
+    {RefreshMode.OFF, RefreshMode.FORCE, RefreshMode.CHARGING_DETECTION}
+)
+
+
+@unique
+class PollingPhase(Enum):
+    OFF = "off"
+    FORCE = "force"
+    CHARGING_DETECTION = "charging_detection"
+    ERROR_RECOVERY = "error_recovery"
+    CHARGING = "charging"
+    ACTIVE = "active"
+    AFTER_SHUTDOWN = "after_shutdown"
+    INACTIVE = "inactive"
 
 
 class VehicleState:
@@ -328,12 +352,26 @@ class VehicleState:
         match self.refresh_mode:
             case RefreshMode.OFF:
                 LOG.debug(f"Refresh mode is OFF, skipping vehicle {self.vin} refresh")
+                self.__publish_polling_phase(PollingPhase.OFF)
                 return False
             case RefreshMode.FORCE:
-                LOG.debug(f"Refresh mode is FORCE, skipping vehicle {self.vin} refresh")
+                LOG.debug(f"Refresh mode is FORCE, forcing vehicle {self.vin} refresh")
+                self.__publish_polling_phase(PollingPhase.FORCE)
                 self.set_refresh_mode(
                     self.previous_refresh_mode,
                     "restoring of previous refresh mode after a FORCE execution",
+                )
+                return True
+            case RefreshMode.CHARGING_DETECTION:
+                LOG.debug(
+                    f"Refresh mode is CHARGING_DETECTION, resetting last_car_shutdown "
+                    f"and forcing vehicle {self.vin} refresh"
+                )
+                self.__publish_polling_phase(PollingPhase.CHARGING_DETECTION)
+                self.last_car_shutdown = datetime.datetime.now(tz=datetime.UTC)
+                self.set_refresh_mode(
+                    self.previous_refresh_mode,
+                    "restoring of previous refresh mode after a CHARGING_DETECTION execution",
                 )
                 return True
             # RefreshMode.PERIODIC is treated like default
@@ -353,6 +391,7 @@ class VehicleState:
                 f"Polling vehicle {self.vin} as last_car_activity is newer than last_actual_poll."
                 f" {self.last_car_activity} > {last_actual_poll}"
             )
+            self.__publish_polling_phase(PollingPhase.ACTIVE)
             return True
         if self.last_failed_refresh is not None:
             threshold = datetime.datetime.now() - datetime.timedelta(
@@ -360,6 +399,7 @@ class VehicleState:
             )
             result: bool = self.last_failed_refresh < threshold
             LOG.debug(f"Gateway failed refresh previously. Should refresh: {result}")
+            self.__publish_polling_phase(PollingPhase.ERROR_RECOVERY)
             return result
         if self.is_charging and self.refresh_period_charging > 0:
             result = (
@@ -368,6 +408,7 @@ class VehicleState:
                 - datetime.timedelta(seconds=float(self.refresh_period_charging))
             )
             LOG.debug(f"HV battery is charging. Should refresh: {result}")
+            self.__publish_polling_phase(PollingPhase.CHARGING)
             return result
         if self.hv_battery_active:
             result = (
@@ -376,6 +417,7 @@ class VehicleState:
                 - datetime.timedelta(seconds=float(self.refresh_period_active))
             )
             LOG.debug(f"HV battery is active. Should refresh: {result}")
+            self.__publish_polling_phase(PollingPhase.ACTIVE)
             return result
         last_shutdown_plus_refresh = self.last_car_shutdown + datetime.timedelta(
             seconds=float(self.refresh_period_inactive_grace)
@@ -389,6 +431,7 @@ class VehicleState:
             LOG.debug(
                 f"Refresh grace period after shutdown has not passed. Should refresh: {result}"
             )
+            self.__publish_polling_phase(PollingPhase.AFTER_SHUTDOWN)
             return result
         result = (
             self.last_successful_refresh
@@ -398,6 +441,7 @@ class VehicleState:
         LOG.debug(
             f"HV battery is inactive and refresh period after shutdown is over. Should refresh: {result}"
         )
+        self.__publish_polling_phase(PollingPhase.INACTIVE)
         return result
 
     def mark_successful_refresh(self) -> None:
@@ -452,7 +496,7 @@ class VehicleState:
         if self.__remote_ac_temp is None:
             self.set_ac_temperature(DEFAULT_AC_TEMP)
         # Make sure the only refresh mode that is not supported at start is RefreshMode.PERIODIC
-        if self.refresh_mode in [RefreshMode.OFF, RefreshMode.FORCE]:
+        if self.refresh_mode in INVALID_STARTUP_REFRESH_MODES:
             self.set_refresh_mode(
                 RefreshMode.PERIODIC,
                 f"initial gateway startup from an invalid state {self.refresh_mode}",
@@ -640,6 +684,11 @@ class VehicleState:
     def get_topic(self, sub_topic: str) -> str:
         return f"{self.mqtt_vin_prefix}/{sub_topic}"
 
+    def __publish_polling_phase(self, phase: PollingPhase) -> None:
+        self.publisher.publish_str(
+            self.get_topic(mqtt_topics.REFRESH_POLLING_PHASE), phase.value
+        )
+
     def set_refresh_mode(self, mode: RefreshMode, cause: str) -> None:
         if mode is not None and (
             self.refresh_mode is None or self.refresh_mode != mode
@@ -649,8 +698,8 @@ class VehicleState:
             self.publisher.publish_str(
                 self.get_topic(mqtt_topics.REFRESH_MODE), new_mode_value
             )
-            # Make sure we never store FORCE as previous refresh mode
-            if self.refresh_mode != RefreshMode.FORCE:
+            # Make sure we never store one-shot modes as previous refresh mode
+            if self.refresh_mode not in ONE_SHOT_REFRESH_MODES:
                 self.previous_refresh_mode = self.refresh_mode
             self.refresh_mode = mode
             LOG.debug("Refresh mode set to %s due to %s", self.refresh_mode, cause)
