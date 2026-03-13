@@ -341,7 +341,7 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
         old_shutdown = self.vehicle_state.last_car_shutdown
         self.vehicle_state.is_charging = True
         # Simulate significant charging power detected via handle_charge_status
-        self.vehicle_state._VehicleState__had_significant_charging_power = True
+        self.vehicle_state._had_significant_charging_power = True
         self.vehicle_state.is_charging = False
         assert self.vehicle_state.last_car_shutdown > old_shutdown
 
@@ -466,7 +466,7 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
         # Car is parked (off), only charging keeps it "active"
         self.vehicle_state.hv_battery_active = False
         self.vehicle_state.is_charging = True
-        self.vehicle_state._VehicleState__had_significant_charging_power = True
+        self.vehicle_state._had_significant_charging_power = True
         self.vehicle_state.hv_battery_active = True
         # Simulate a recent successful refresh
         self.vehicle_state.last_successful_refresh = datetime.datetime.now(

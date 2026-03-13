@@ -119,7 +119,7 @@ class VehicleState:
         self.__hv_battery_active = True
         self.__hv_battery_active_from_car = True
         self.__is_charging = False
-        self.__had_significant_charging_power = False
+        self._had_significant_charging_power = False
         self.refresh_period_active = -1
         self.refresh_period_inactive = -1
         self.refresh_period_after_shutdown = -1
@@ -293,7 +293,7 @@ class VehicleState:
     @is_charging.setter
     def is_charging(self, new_state: bool) -> None:
         old_state = self.__is_charging
-        if old_state and not new_state and self.__had_significant_charging_power:
+        if old_state and not new_state and self._had_significant_charging_power:
             self.last_car_shutdown = datetime.datetime.now(tz=datetime.UTC)
             LOG.info(
                 "Charging stopped for vehicle %s, resetting last_car_shutdown to %s",
@@ -301,7 +301,7 @@ class VehicleState:
                 self.last_car_shutdown,
             )
         if not new_state:
-            self.__had_significant_charging_power = False
+            self._had_significant_charging_power = False
         self.__is_charging = new_state
 
     def set_is_charging(self, is_charging: bool) -> None:
@@ -598,7 +598,7 @@ class VehicleState:
 
         if self.is_charging and result.power is not None and result.power < -1:
             # Mark that we've seen significant charging power (> 1kW)
-            self.__had_significant_charging_power = True
+            self._had_significant_charging_power = True
             # Only compute a dynamic refresh period if we have detected at least 1kW of power during charging
             time_for_1pct = (
                 36.0 * result.real_total_battery_capacity / abs(result.power)
