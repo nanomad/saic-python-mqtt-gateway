@@ -560,23 +560,17 @@ def __process_charging_stations_file(config: Configuration, json_file: str) -> N
             data = json.load(f)
 
             for item in data:
-                charge_state_topic = item["chargeStateTopic"]
-                charging_value = item["chargingValue"]
                 vin = item["vin"]
-                if "socTopic" in item:
-                    charging_station = ChargingStation(
-                        vin, charge_state_topic, charging_value, item["socTopic"]
-                    )
-                else:
-                    charging_station = ChargingStation(
-                        vin, charge_state_topic, charging_value
-                    )
-                if "rangeTopic" in item:
-                    charging_station.range_topic = item["rangeTopic"]
-                if "chargerConnectedTopic" in item:
-                    charging_station.connected_topic = item["chargerConnectedTopic"]
-                if "chargerConnectedValue" in item:
-                    charging_station.connected_value = item["chargerConnectedValue"]
+                charging_station = ChargingStation(
+                    vin=vin,
+                    charge_state_topic=item["chargeStateTopic"],
+                    charging_value=item["chargingValue"],
+                    soc_topic=item.get("socTopic"),
+                    soc_ts_topic=item.get("socTsTopic"),
+                    range_topic=item.get("rangeTopic"),
+                    connected_topic=item.get("chargerConnectedTopic"),
+                    connected_value=item.get("chargerConnectedValue"),
+                )
                 config.charging_stations_by_vin[vin] = charging_station
     except FileNotFoundError:
         LOG.warning(f"File {json_file} does not exist")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import logging
 from typing import TYPE_CHECKING
 
@@ -40,7 +41,7 @@ class OpenWBIntegration:
             vehicle_status, charge_status
         )
         if electric_range is not None and range_topic is not None:
-            LOG.info("OpenWB Integration published range to %f", range_topic)
+            LOG.info("OpenWB Integration published range to %s", range_topic)
             self.__publisher.publish_float(
                 key=range_topic,
                 value=electric_range,
@@ -56,3 +57,13 @@ class OpenWBIntegration:
                 value=soc,
                 no_prefix=True,
             )
+
+            soc_ts_topic = self.__charging_station.soc_ts_topic
+            if soc_ts_topic is not None:
+                soc_ts = int(datetime.datetime.now(tz=datetime.UTC).timestamp())
+                LOG.info("OpenWB Integration published SoC timestamp to %s", soc_ts_topic)
+                self.__publisher.publish_int(
+                    key=soc_ts_topic,
+                    value=soc_ts,
+                    no_prefix=True,
+                )
