@@ -704,7 +704,7 @@ class HomeAssistantDiscovery(HomeAssistantDiscoveryBase):
             mqtt_topics.REFRESH_POLLING_PHASE,
             "Gateway polling phase",
             entity_category="diagnostic",
-            icon="mdi:poll",
+            icon="mdi:list-status",
             custom_availability=self.__system_availability_config,
         )
 
