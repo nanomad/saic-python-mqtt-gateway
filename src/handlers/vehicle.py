@@ -338,6 +338,32 @@ class VehicleHandler:
         return None
 
 
+    def handle_charging_station_energy_imported(
+        self, imported_energy_wh: float
+    ) -> None:
+        if self.openwb_integration is None:
+            return
+        should_refresh = self.openwb_integration.should_refresh_by_imported_energy(
+            imported_energy_wh=imported_energy_wh,
+            battery_capacity_kwh=self.vin_info.real_battery_capacity,
+            charge_polling_min_percent=self.vehicle_state.charge_polling_min_percent,
+        )
+        if should_refresh:
+            LOG.info(
+                "Imported energy threshold reached for VIN %s, forcing refresh",
+                self.vin_info.vin,
+            )
+            self.vehicle_state.set_refresh_mode(
+                RefreshMode.FORCE,
+                "imported energy threshold reached",
+            )
+
+    def handle_charger_connection_state_changed(self, connected: bool) -> None:
+        if self.openwb_integration is None:
+            return
+        self.openwb_integration.set_charger_connection_state(connected)
+
+
 class VehicleHandlerLocator(ABC):
     @abstractmethod
     def get_vehicle_handler(self, vin: str) -> VehicleHandler | None:

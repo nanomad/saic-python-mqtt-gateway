@@ -376,6 +376,26 @@ class MqttGateway(MqttCommandListener, VehicleHandlerLocator):
             LOG.debug(f"Charging detected for unknown vin {vin}")
 
     @override
+    async def on_charging_station_energy_imported(
+        self, vin: str, imported_energy_wh: float
+    ) -> None:
+        vehicle_handler = self.get_vehicle_handler(vin)
+        if vehicle_handler:
+            vehicle_handler.handle_charging_station_energy_imported(imported_energy_wh)
+        else:
+            LOG.debug(f"Energy imported for unknown vin {vin}")
+
+    @override
+    async def on_charger_connection_state_changed(
+        self, vin: str, connected: bool
+    ) -> None:
+        vehicle_handler = self.get_vehicle_handler(vin)
+        if vehicle_handler:
+            vehicle_handler.handle_charger_connection_state_changed(connected)
+        else:
+            LOG.debug(f"Charger connection state changed for unknown vin {vin}")
+
+    @override
     def on_mqtt_reconnected(self) -> None:
         LOG.info("MQTT reconnected, resetting HA discovery for all vehicles")
         if self.__gateway_discovery is not None:

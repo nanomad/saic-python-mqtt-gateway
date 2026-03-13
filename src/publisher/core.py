@@ -30,6 +30,18 @@ class MqttCommandListener(ABC):
     ) -> None:
         raise NotImplementedError("Should have implemented this")
 
+    @abstractmethod
+    async def on_charging_station_energy_imported(
+        self, vin: str, imported_energy_wh: float
+    ) -> None:
+        raise NotImplementedError("Should have implemented this")
+
+    @abstractmethod
+    async def on_charger_connection_state_changed(
+        self, vin: str, connected: bool
+    ) -> None:
+        raise NotImplementedError("Should have implemented this")
+
     def on_mqtt_reconnected(self) -> None:  # noqa: B027
         """Reset state when the MQTT client reconnects after a connection loss.
 
