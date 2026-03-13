@@ -570,6 +570,7 @@ def __process_charging_stations_file(config: Configuration, json_file: str) -> N
                     range_topic=item.get("rangeTopic"),
                     connected_topic=item.get("chargerConnectedTopic"),
                     connected_value=item.get("chargerConnectedValue"),
+                    imported_energy_topic=item.get("importedEnergyTopic"),
                 )
                 config.charging_stations_by_vin[vin] = charging_station
     except FileNotFoundError:

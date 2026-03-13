@@ -129,7 +129,16 @@ The key-value pairs in the JSON express the following:
 | rangeTopic            | topic where the gateway publishes the range for the charging station - optional                   |
 | chargerConnectedTopic | topic indicating that the vehicle is connected to the charging station - optional                 |
 | chargerConnectedValue | payload that indicates that the charger is connected - optional                                   |
+| importedEnergyTopic   | topic providing the imported energy (Wh) from the charging station - optional                     |
 | vin                   | vehicle identification number to map the charging station information to a vehicle - **required** |
+
+#### `importedEnergyTopic`
+
+This topic provides the amount of energy imported by the charging station, measured in watt-hours.
+
+During the charging process, the system normally calculates the vehicle status refresh interval based on the current charging power and the vehicle's battery capacity. However, this estimation can become inaccurate during PV surplus charging, where the charging power fluctuates significantly.
+
+If the charging station can report the total imported energy (for example, the `daily_imported` topic provided by openWB), this value can be used instead to determine when to refresh the vehicle status. This approach ensures more reliable updates even under variable charging conditions.
 
 ### Advanced settings
 

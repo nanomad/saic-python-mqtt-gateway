@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import math
 from typing import Any
 import unittest
 from unittest.mock import patch
@@ -31,6 +32,12 @@ SOC_TS_TOPIC = "/mock/soc/timestamp"
 CHARGING_VALUE = "VehicleIsCharging"
 
 FROZEN_TIME = datetime.datetime(2025, 1, 1, 12, 0, 0, tzinfo=datetime.UTC)
+
+# Constants for imported energy tests
+BATTERY_CAPACITY_KWH = 64.0
+CHARGE_POLLING_MIN_PERCENT = 1.0
+ENERGY_PER_PERCENT = BATTERY_CAPACITY_KWH * 1000.0 / 100.0
+ENERGY_THRESHOLD = math.ceil(CHARGE_POLLING_MIN_PERCENT * ENERGY_PER_PERCENT)
 
 
 def _make_vehicle_state(publisher: MessageCapturingConsolePublisher) -> VehicleState:
@@ -179,3 +186,96 @@ class TestOpenWBIntegration(unittest.IsolatedAsyncioTestCase):
                 assert value == mqtt_map[topic]
         else:
             self.fail(f"MQTT map does not contain topic {topic}")
+
+
+class TestImportedEnergyRefresh(unittest.TestCase):
+    def setUp(self) -> None:
+        config = Configuration()
+        config.anonymized_publishing = False
+        publisher = MessageCapturingConsolePublisher(config)
+        self.integration = _make_integration(publisher)
+
+    def _should_refresh(self, energy_wh: float) -> bool:
+        return self.integration.should_refresh_by_imported_energy(
+            imported_energy_wh=energy_wh,
+            battery_capacity_kwh=BATTERY_CAPACITY_KWH,
+            charge_polling_min_percent=CHARGE_POLLING_MIN_PERCENT,
+        )
+
+    def test_no_battery_capacity_returns_false(self) -> None:
+        result = self.integration.should_refresh_by_imported_energy(
+            imported_energy_wh=1000.0,
+            battery_capacity_kwh=None,
+            charge_polling_min_percent=CHARGE_POLLING_MIN_PERCENT,
+        )
+        assert not result
+
+    def test_zero_battery_capacity_returns_false(self) -> None:
+        result = self.integration.should_refresh_by_imported_energy(
+            imported_energy_wh=1000.0,
+            battery_capacity_kwh=0.0,
+            charge_polling_min_percent=CHARGE_POLLING_MIN_PERCENT,
+        )
+        assert not result
+
+    def test_negative_battery_capacity_returns_false(self) -> None:
+        result = self.integration.should_refresh_by_imported_energy(
+            imported_energy_wh=1000.0,
+            battery_capacity_kwh=-1.0,
+            charge_polling_min_percent=CHARGE_POLLING_MIN_PERCENT,
+        )
+        assert not result
+
+    def test_zero_polling_percent_returns_false(self) -> None:
+        result = self.integration.should_refresh_by_imported_energy(
+            imported_energy_wh=1000.0,
+            battery_capacity_kwh=BATTERY_CAPACITY_KWH,
+            charge_polling_min_percent=0.0,
+        )
+        assert not result
+
+    def test_first_call_initializes_threshold(self) -> None:
+        assert not self._should_refresh(1000.0)
+
+    def test_below_threshold_no_refresh(self) -> None:
+        self._should_refresh(1000.0)  # initialize
+        assert not self._should_refresh(1000.0 + ENERGY_THRESHOLD - 1)
+
+    def test_at_threshold_triggers_refresh(self) -> None:
+        self._should_refresh(1000.0)  # initialize
+        assert self._should_refresh(1000.0 + ENERGY_THRESHOLD)
+
+    def test_next_threshold_after_refresh(self) -> None:
+        self._should_refresh(1000.0)  # initialize
+        energy_at_first_refresh = 1000.0 + ENERGY_THRESHOLD
+        assert self._should_refresh(energy_at_first_refresh)
+        # Should not refresh again immediately
+        assert not self._should_refresh(energy_at_first_refresh + 1)
+        # Should refresh at second threshold
+        assert self._should_refresh(energy_at_first_refresh + ENERGY_THRESHOLD)
+
+    def test_counter_reset_reinitializes(self) -> None:
+        self._should_refresh(5000.0)  # initialize at 5kWh
+        assert self._should_refresh(5000.0 + ENERGY_THRESHOLD)  # first refresh
+        # Counter resets to 0 (e.g. daily reset)
+        assert not self._should_refresh(0.0)
+        # New threshold from 0
+        assert self._should_refresh(float(ENERGY_THRESHOLD))
+
+    def test_unknown_charger_state_allows_energy_check(self) -> None:
+        """Energy check proceeds when charger connection state is unknown (no topic configured)."""
+        assert not self._should_refresh(1000.0)  # initializes
+        assert self._should_refresh(1000.0 + ENERGY_THRESHOLD)  # triggers
+
+    def test_charger_disconnected_skips_check(self) -> None:
+        self.integration.set_charger_connection_state(False)
+        assert not self._should_refresh(99999.0)
+
+    def test_charger_reconnect_resets_state(self) -> None:
+        self._should_refresh(1000.0)  # initialize
+        self.integration.set_charger_connection_state(False)
+        self.integration.set_charger_connection_state(True)
+        # After reconnect, first call re-initializes (returns False)
+        assert not self._should_refresh(0.0)
+        # Then threshold works from new baseline
+        assert self._should_refresh(float(ENERGY_THRESHOLD))
