@@ -566,11 +566,11 @@ def __process_charging_stations_file(config: Configuration, json_file: str) -> N
                 soc_ts_topic = item.get("socTsTopic")
                 vin = item["vin"]
                 charging_station = ChargingStation(
-                    vin,
-                    charge_state_topic,
-                    charging_value,
-                    soc_topic,
-                    soc_ts_topic,
+                    vin=vin,
+                    charge_state_topic=charge_state_topic,
+                    charging_value=charging_value,
+                    soc_topic=soc_topic,
+                    soc_ts_topic=soc_ts_topic,
                 )
                 if "rangeTopic" in item:
                     charging_station.range_topic = item["rangeTopic"]

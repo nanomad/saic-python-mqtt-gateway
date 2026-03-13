@@ -4,6 +4,7 @@ from __future__ import annotations
 class ChargingStation:
     def __init__(
         self,
+        *,
         vin: str,
         charge_state_topic: str,
         charging_value: str,
