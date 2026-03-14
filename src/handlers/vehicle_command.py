@@ -86,10 +86,9 @@ class VehicleCommandHandler:
             }
             self.publisher.publish_json(error_topic, event_payload, retain=False)
         except Exception:
-            LOG.warning(
+            LOG.exception(
                 "Failed to publish command error event for command %s",
                 command,
-                exc_info=True,
             )
 
     async def handle_mqtt_command(self, *, topic: str, payload: str) -> None:

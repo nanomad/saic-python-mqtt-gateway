@@ -9,6 +9,7 @@ from saic_ismart_client_ng.api.message import MessageEntity
 
 import mqtt_topics
 from status_publisher import VehicleDataPublisher
+from utils import ensure_datetime_aware
 
 if TYPE_CHECKING:
     from publisher.core import Publisher
@@ -16,13 +17,6 @@ if TYPE_CHECKING:
 
 LOG = logging.getLogger(__name__)
 _EPOCH_MIN = datetime.min.replace(tzinfo=UTC)
-
-
-def _ensure_aware(dt: datetime) -> datetime:
-    """Return *dt* with UTC tzinfo if it is naive, otherwise unchanged."""
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=UTC)
-    return dt
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -41,7 +35,7 @@ class MessagePublisher(
 
     @override
     def publish(self, message: MessageEntity) -> MessagePublisherProcessingResult:
-        msg_time = _ensure_aware(message.message_time)
+        msg_time = ensure_datetime_aware(message.message_time)
         if (
             self.__last_car_vehicle_message == _EPOCH_MIN
             or msg_time > self.__last_car_vehicle_message

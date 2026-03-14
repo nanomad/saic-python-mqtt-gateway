@@ -53,12 +53,15 @@ class VehicleDataPublisher[I, O](metaclass=ABCMeta):
         validator: Callable[[T], bool] = lambda _: True,
         transform: Callable[[T], Publishable],
         no_prefix: bool = False,
+        retain: bool = True,
     ) -> tuple[bool, Publishable | None]:
         if value is None or not validator(value):
             return False, None
         actual_topic = topic if no_prefix else self.__get_topic(topic)
         transformed_value = transform(value)
-        published = self._publish_directly(topic=actual_topic, value=transformed_value)
+        published = self._publish_directly(
+            topic=actual_topic, value=transformed_value, retain=retain
+        )
         return published, transformed_value
 
     def _publish_directly(
