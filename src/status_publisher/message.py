@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+import logging
 from typing import TYPE_CHECKING, override
 
 from saic_ismart_client_ng.api.message import MessageEntity
@@ -12,6 +13,8 @@ from status_publisher import VehicleDataPublisher
 if TYPE_CHECKING:
     from publisher.core import Publisher
     from vehicle_info import VehicleInfo
+
+LOG = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -82,5 +85,26 @@ class MessagePublisher(
                 value=message.vin,
             )
 
+            self.__publish_message_event(message)
+
             return MessagePublisherProcessingResult(processed=True)
         return MessagePublisherProcessingResult(processed=False)
+
+    def __publish_message_event(self, message: MessageEntity) -> None:
+        try:
+            self._publish(
+                topic=mqtt_topics.EVENTS_VEHICLE_MESSAGE,
+                value={
+                    "event_type": "vehicle_message",
+                    "title": message.title or "",
+                    "content": message.content or "",
+                    "message_type": message.messageType or "",
+                    "sender": message.sender or "",
+                    "vin": message.vin or "",
+                },
+            )
+        except Exception:
+            LOG.warning(
+                "Failed to publish vehicle message event",
+                exc_info=True,
+            )
