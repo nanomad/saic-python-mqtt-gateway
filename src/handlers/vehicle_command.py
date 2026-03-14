@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from saic_ismart_client_ng.exceptions import SaicApiException, SaicLogoutException
 
@@ -57,13 +57,51 @@ class VehicleCommandHandler:
     def publisher(self) -> Publisher:
         return self.vehicle_state.publisher
 
+    def __report_command_failure(
+        self,
+        *,
+        command: str,
+        result_topic: str,
+        detail: str,
+        exc: Exception | None = None,
+    ) -> None:
+        if exc is not None:
+            LOG.exception("Command %s failed: %s", command, detail, exc_info=exc)
+        else:
+            LOG.error("Command %s failed: %s", command, detail)
+        try:
+            self.publisher.publish_str(result_topic, f"Failed: {detail}")
+        except Exception:
+            LOG.warning(
+                "Failed to publish failure result for command %s",
+                command,
+                exc_info=True,
+            )
+        try:
+            error_topic = self.vehicle_state.get_topic(mqtt_topics.COMMAND_ERROR)
+            event_payload: dict[str, Any] = {
+                "event_type": "command_error",
+                "command": command,
+                "detail": detail,
+            }
+            self.publisher.publish_json(error_topic, event_payload)
+        except Exception:
+            LOG.warning(
+                "Failed to publish command error event for command %s",
+                command,
+                exc_info=True,
+            )
+
     async def handle_mqtt_command(self, *, topic: str, payload: str) -> None:
         analyzed_topic = self.__get_command_topics(topic)
         handler = self.__command_handlers.get(analyzed_topic.command_no_vin)
         if not handler:
             msg = f"No handler found for command topic {analyzed_topic.command_no_vin}"
-            self.publisher.publish_str(analyzed_topic.response_no_global, msg)
-            LOG.error(msg)
+            self.__report_command_failure(
+                command=analyzed_topic.command_no_vin,
+                result_topic=analyzed_topic.response_no_global,
+                detail=msg,
+            )
         else:
             await self.__execute_mqtt_command_handler(
                 handler=handler, payload=payload, analyzed_topic=analyzed_topic
@@ -90,8 +128,9 @@ class VehicleCommandHandler:
             if execution_result.clear_command:
                 self.publisher.clear_topic(topic_no_global)
         except MqttGatewayException as e:
-            self.publisher.publish_str(result_topic, f"Failed: {e.message}")
-            LOG.exception(e.message, exc_info=e)
+            self.__report_command_failure(
+                command=topic, result_topic=result_topic, detail=e.message, exc=e
+            )
         except SaicLogoutException:
             LOG.warning(
                 "API Client was logged out, attempting immediate relogin and retry"
@@ -99,10 +138,12 @@ class VehicleCommandHandler:
             try:
                 await self.relogin_handler.force_login()
             except Exception as login_err:
-                self.publisher.publish_str(
-                    result_topic, f"Failed: relogin failed ({login_err})"
+                self.__report_command_failure(
+                    command=topic,
+                    result_topic=result_topic,
+                    detail=f"relogin failed ({login_err})",
+                    exc=login_err,
                 )
-                LOG.error("Immediate relogin failed", exc_info=login_err)
                 return
             try:
                 execution_result = await handler.handle(payload)
@@ -115,19 +156,22 @@ class VehicleCommandHandler:
                 if execution_result.clear_command:
                     self.publisher.clear_topic(topic_no_global)
             except Exception as retry_err:
-                self.publisher.publish_str(
-                    result_topic, f"Failed: {retry_err}"
-                )
-                LOG.error(
-                    "Command retry after relogin failed", exc_info=retry_err
+                self.__report_command_failure(
+                    command=topic,
+                    result_topic=result_topic,
+                    detail=str(retry_err),
+                    exc=retry_err,
                 )
         except SaicApiException as se:
-            self.publisher.publish_str(result_topic, f"Failed: {se.message}")
-            LOG.exception(se.message, exc_info=se)
-        except Exception as se:
-            self.publisher.publish_str(result_topic, "Failed unexpectedly")
-            LOG.exception(
-                "handle_mqtt_command failed with an unexpected exception", exc_info=se
+            self.__report_command_failure(
+                command=topic, result_topic=result_topic, detail=se.message, exc=se
+            )
+        except Exception as e:
+            self.__report_command_failure(
+                command=topic,
+                result_topic=result_topic,
+                detail="unexpected error",
+                exc=e,
             )
 
     def __get_command_topics(self, topic: str) -> _MqttCommandTopic:
