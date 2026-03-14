@@ -18,6 +18,13 @@ if TYPE_CHECKING:
 LOG = logging.getLogger(__name__)
 
 
+def _ensure_aware(dt: datetime.datetime) -> datetime.datetime:
+    """Return *dt* with UTC tzinfo if it is naive, otherwise unchanged."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=datetime.UTC)
+    return dt
+
+
 class MessageHandler:
     def __init__(
         self,
@@ -53,10 +60,10 @@ class MessageHandler:
             if (
                 latest_message is not None
                 and latest_message.messageId != self.last_message_id
-                and latest_message.message_time > self.last_message_ts
+                and _ensure_aware(latest_message.message_time) > self.last_message_ts
             ):
                 self.last_message_id = latest_message.messageId
-                self.last_message_ts = latest_message.message_time
+                self.last_message_ts = _ensure_aware(latest_message.message_time)
                 LOG.info(
                     f"{latest_message.title} detected at {latest_message.message_time}"
                 )
@@ -106,7 +113,7 @@ class MessageHandler:
                 oldest_message = self.__get_oldest_message(all_messages)
                 if (
                     oldest_message is not None
-                    and oldest_message.message_time < self.last_message_ts
+                    and _ensure_aware(oldest_message.message_time) < self.last_message_ts
                 ):
                     return all_messages
             except SaicLogoutException:

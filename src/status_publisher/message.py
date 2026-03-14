@@ -15,6 +15,14 @@ if TYPE_CHECKING:
     from vehicle_info import VehicleInfo
 
 LOG = logging.getLogger(__name__)
+_EPOCH_MIN = datetime.min.replace(tzinfo=UTC)
+
+
+def _ensure_aware(dt: datetime) -> datetime:
+    """Return *dt* with UTC tzinfo if it is naive, otherwise unchanged."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -29,15 +37,16 @@ class MessagePublisher(
         self, vin: VehicleInfo, publisher: Publisher, mqtt_vehicle_prefix: str
     ) -> None:
         super().__init__(vin, publisher, mqtt_vehicle_prefix)
-        self.__last_car_vehicle_message = datetime.min.replace(tzinfo=UTC)
+        self.__last_car_vehicle_message = _EPOCH_MIN
 
     @override
     def publish(self, message: MessageEntity) -> MessagePublisherProcessingResult:
+        msg_time = _ensure_aware(message.message_time)
         if (
-            self.__last_car_vehicle_message == datetime.min.replace(tzinfo=UTC)
-            or message.message_time > self.__last_car_vehicle_message
+            self.__last_car_vehicle_message == _EPOCH_MIN
+            or msg_time > self.__last_car_vehicle_message
         ):
-            self.__last_car_vehicle_message = message.message_time
+            self.__last_car_vehicle_message = msg_time
             self._publish(
                 topic=mqtt_topics.INFO_LAST_MESSAGE_TIME,
                 value=self.__last_car_vehicle_message,
