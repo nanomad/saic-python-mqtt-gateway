@@ -158,10 +158,10 @@ class TestMessageEventResilience(unittest.TestCase):
         publisher, capturing = _make_publisher()
         original_publish = publisher._publish_directly
 
-        def failing_publish(*, topic: str, value: Any) -> bool:
-            if mqtt_topics.EVENTS_VEHICLE_MESSAGE in topic:
+        def failing_publish(**kwargs: Any) -> bool:
+            if mqtt_topics.EVENTS_VEHICLE_MESSAGE in kwargs["topic"]:
                 raise RuntimeError("MQTT down")
-            return original_publish(topic=topic, value=value)
+            return original_publish(**kwargs)
 
         with patch.object(publisher, "_publish_directly", side_effect=failing_publish):
             result = publisher.publish(_make_message())

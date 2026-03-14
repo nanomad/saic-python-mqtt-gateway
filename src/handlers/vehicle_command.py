@@ -84,7 +84,7 @@ class VehicleCommandHandler:
                 "command": command,
                 "detail": detail,
             }
-            self.publisher.publish_json(error_topic, event_payload)
+            self.publisher.publish_json(error_topic, event_payload, retain=False)
         except Exception:
             LOG.warning(
                 "Failed to publish command error event for command %s",

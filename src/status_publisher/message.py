@@ -104,6 +104,7 @@ class MessagePublisher(
                     "sender": message.sender or "",
                     "vin": message.vin or "",
                 },
+                retain=False,
             )
         except Exception:
             LOG.exception(
