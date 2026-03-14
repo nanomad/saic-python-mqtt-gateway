@@ -91,6 +91,8 @@ class MessagePublisher(
         return MessagePublisherProcessingResult(processed=False)
 
     def __publish_message_event(self, message: MessageEntity) -> None:
+        # Best-effort: a failure here must not prevent the individual
+        # topic publishes above from being reported as successful.
         try:
             self._publish(
                 topic=mqtt_topics.EVENTS_VEHICLE_MESSAGE,
@@ -104,7 +106,8 @@ class MessagePublisher(
                 },
             )
         except Exception:
-            LOG.warning(
-                "Failed to publish vehicle message event",
-                exc_info=True,
+            LOG.exception(
+                "Failed to publish vehicle message event for message %s (VIN: %s)",
+                message.messageId,
+                message.vin,
             )

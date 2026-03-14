@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 import unittest
+from unittest.mock import patch
 
 from saic_ismart_client_ng.api.message import MessageEntity
 from saic_ismart_client_ng.api.vehicle.schema import VinInfo
@@ -150,3 +151,22 @@ class TestMessageEventPayload(unittest.TestCase):
             "sender",
             "vin",
         }
+
+
+class TestMessageEventResilience(unittest.TestCase):
+    def test_event_publish_failure_does_not_break_processing(self) -> None:
+        publisher, capturing = _make_publisher()
+        original_publish = publisher._publish_directly
+
+        def failing_publish(*, topic: str, value: Any) -> bool:
+            if mqtt_topics.EVENTS_VEHICLE_MESSAGE in topic:
+                raise RuntimeError("MQTT down")
+            return original_publish(topic=topic, value=value)
+
+        with patch.object(publisher, "_publish_directly", side_effect=failing_publish):
+            result = publisher.publish(_make_message())
+
+        assert result.processed is True
+        assert EVENT_TOPIC not in capturing.map
+        time_topic = f"{VEHICLE_PREFIX}/{mqtt_topics.INFO_LAST_MESSAGE_TIME}"
+        assert time_topic in capturing.map
