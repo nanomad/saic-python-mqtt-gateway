@@ -91,7 +91,9 @@ class VehicleCommandHandler:
                 command,
             )
 
-    async def handle_mqtt_command(self, *, topic: str, payload: str) -> None:
+    async def handle_mqtt_command(
+        self, *, topic: str, payload: str, retained: bool = False
+    ) -> None:
         analyzed_topic = self.__get_command_topics(topic)
         handler = self.__command_handlers.get(analyzed_topic.command_no_vin)
         if not handler:
@@ -103,7 +105,10 @@ class VehicleCommandHandler:
             )
         else:
             await self.__execute_mqtt_command_handler(
-                handler=handler, payload=payload, analyzed_topic=analyzed_topic
+                handler=handler,
+                payload=payload,
+                analyzed_topic=analyzed_topic,
+                retained=retained,
             )
 
     async def __execute_mqtt_command_handler(
@@ -112,19 +117,33 @@ class VehicleCommandHandler:
         handler: CommandHandlerBase,
         payload: str,
         analyzed_topic: _MqttCommandTopic,
+        retained: bool,
     ) -> None:
         topic = analyzed_topic.command_no_vin
         topic_no_global = analyzed_topic.command_no_global
         result_topic = analyzed_topic.response_no_global
 
+        if retained and not handler.is_replayable_when_retained():
+            # A retained `/set` for an action-bearing command would re-fire the
+            # action on every gateway restart. Drop it before invoking the
+            # handler. Only handlers that explicitly opt in via
+            # ``replayable_when_retained = True`` see retained replays.
+            LOG.warning(
+                "Dropping retained replay for non-replayable command %s on %s; "
+                "this command should not have been published with retain=true",
+                handler.name(),
+                topic,
+            )
+            return
+
         try:
-            execution_result = await handler.handle(payload)
+            execution_result = await handler.handle(payload, retained=retained)
             self.publisher.publish_str(result_topic, "Success")
             if execution_result.force_refresh:
                 self.vehicle_state.set_refresh_mode(
                     RefreshMode.FORCE, f"after command execution on topic {topic}"
                 )
-            if execution_result.clear_command:
+            if execution_result.clear_command and not retained:
                 self.publisher.clear_topic(topic_no_global)
         except MqttGatewayException as e:
             self.__report_command_failure(
@@ -145,14 +164,14 @@ class VehicleCommandHandler:
                 )
                 return
             try:
-                execution_result = await handler.handle(payload)
+                execution_result = await handler.handle(payload, retained=retained)
                 self.publisher.publish_str(result_topic, "Success")
                 if execution_result.force_refresh:
                     self.vehicle_state.set_refresh_mode(
                         RefreshMode.FORCE,
                         f"after command execution on topic {topic}",
                     )
-                if execution_result.clear_command:
+                if execution_result.clear_command and not retained:
                     self.publisher.clear_topic(topic_no_global)
             except Exception as retry_err:
                 self.__report_command_failure(

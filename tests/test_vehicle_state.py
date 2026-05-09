@@ -192,10 +192,37 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
             self.get_topic(mqtt_topics.CLIMATE_REMOTE_TEMPERATURE)
             not in self.publisher.map
         )
-        # refresh_mode defaults to RefreshMode.OFF (never None), so it IS always published
+        # refresh_mode defaults to RefreshMode.PERIODIC (never None), so it IS always published
         self.assert_mqtt_topic(
-            self.get_topic(mqtt_topics.REFRESH_MODE), RefreshMode.OFF.value
+            self.get_topic(mqtt_topics.REFRESH_MODE), RefreshMode.PERIODIC.value
         )
+
+    def test_configure_missing_skips_when_retained_value_present(self) -> None:
+        """Sentinel guards in configure_missing preserve retained-replay values.
+
+        Retained `/set` replay seeds in-memory state before configure_missing
+        runs; configure_missing must then leave those values alone.
+        """
+        self.vehicle_state.set_refresh_period_active(45)
+        self.vehicle_state.update_battery_capacity(50.0)
+
+        self.vehicle_state.configure_missing()
+
+        assert self.vehicle_state.refresh_period_active == 45
+        assert self.vehicle_state.vehicle.custom_battery_capacity == 50.0
+
+    def test_configure_missing_applies_defaults_when_no_retained(self) -> None:
+        assert self.vehicle_state.refresh_period_active == -1
+        self.vehicle_state.configure_missing()
+        assert self.vehicle_state.refresh_period_active == 30
+        assert self.vehicle_state.refresh_period_inactive == 86400
+        assert self.vehicle_state.refresh_period_after_shutdown == 120
+        assert self.vehicle_state.refresh_period_inactive_grace == 600
+
+    def test_configure_missing_preserves_retained_off_refresh_mode(self) -> None:
+        self.vehicle_state.set_refresh_mode(RefreshMode.OFF, "retained replay")
+        self.vehicle_state.configure_missing()
+        assert self.vehicle_state.refresh_mode == RefreshMode.OFF
 
     def test_republish_command_states_includes_api_values(self) -> None:
         self.vehicle_state.configure_missing()
@@ -280,7 +307,9 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
     def test_handle_vehicle_status_rejects_drifted_timestamp(self) -> None:
         resp = get_mock_vehicle_status_resp()
         resp.statusTime = 1000000000  # 2001-09-09, well outside 15 min window
-        with pytest.raises(VehicleStatusDriftException, match="drifted more than 15 minutes"):
+        with pytest.raises(
+            VehicleStatusDriftException, match="drifted more than 15 minutes"
+        ):
             self.vehicle_state.handle_vehicle_status(resp)
 
     def test_mileage_of_day_published_when_valid(self) -> None:
@@ -303,7 +332,9 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
         chrg_mgmt_data_resp = get_mock_charge_management_data_resp()
         # Set mileageOfDay raw value higher than total mileage raw value
         assert chrg_mgmt_data_resp.rvsChargeStatus is not None
-        chrg_mgmt_data_resp.rvsChargeStatus.mileageOfDay = (DRIVETRAIN_MILEAGE + 100) * 10
+        chrg_mgmt_data_resp.rvsChargeStatus.mileageOfDay = (
+            DRIVETRAIN_MILEAGE + 100
+        ) * 10
         self.vehicle_state.handle_charge_status(chrg_mgmt_data_resp)
 
         assert (
@@ -318,7 +349,9 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
 
         chrg_mgmt_data_resp = get_mock_charge_management_data_resp()
         assert chrg_mgmt_data_resp.rvsChargeStatus is not None
-        chrg_mgmt_data_resp.rvsChargeStatus.mileageSinceLastCharge = (DRIVETRAIN_MILEAGE + 100) * 10
+        chrg_mgmt_data_resp.rvsChargeStatus.mileageSinceLastCharge = (
+            DRIVETRAIN_MILEAGE + 100
+        ) * 10
         self.vehicle_state.handle_charge_status(chrg_mgmt_data_resp)
 
         assert (
@@ -442,9 +475,7 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
         self.vehicle_state.configure_missing()
         # Car just shut down, grace period active
         self.vehicle_state.hv_battery_active = False
-        self.vehicle_state.last_car_shutdown = datetime.datetime.now(
-            tz=datetime.UTC
-        )
+        self.vehicle_state.last_car_shutdown = datetime.datetime.now(tz=datetime.UTC)
         self.vehicle_state.last_car_activity = datetime.datetime.min.replace(
             tzinfo=datetime.UTC
         )
