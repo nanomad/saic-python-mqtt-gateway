@@ -1,16 +1,37 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 import json
 import re
 from typing import TYPE_CHECKING, Any, TypeVar
 
 import mqtt_topics
+from utils import datetime_to_str
 
 if TYPE_CHECKING:
     from configuration import Configuration
 
 T = TypeVar("T")
+
+type Publishable = bool | int | float | str | dict[str, Any] | datetime
+"""Closed union of value types this gateway knows how to publish to MQTT.
+
+Mirrors the typed `publish_*` methods on :class:`Publisher` plus the `dict`
+shape handled by `publish_json`, and `datetime`, which is stringified via
+:func:`utils.datetime_to_str`. Use it at signature boundaries when a caller
+holds "something publishable" without statically knowing which arm.
+"""
+
+type WirePayload = bool | int | float | str
+"""Primitive subset of :data:`Publishable` that reaches the transport layer.
+
+After the typed `publish_*` methods do their work (`publish_json` serializes
+dicts to JSON strings, `publish_datetime` stringifies via
+:func:`utils.datetime_to_str`), only these scalar arms cross the
+publisher/transport boundary. Use `WirePayload | None` for wire-level helpers
+where `None` means "clear the retained message."
+"""
 
 
 class MqttCommandListener(ABC):
@@ -107,6 +128,49 @@ class Publisher(ABC):
         self, key: str, value: float, no_prefix: bool = False, *, retain: bool = True
     ) -> None:
         raise NotImplementedError
+
+    def publish_datetime(
+        self,
+        key: str,
+        value: datetime,
+        no_prefix: bool = False,
+        *,
+        retain: bool = True,
+    ) -> None:
+        """Stringify a datetime via :func:`utils.datetime_to_str` and publish."""
+        self.publish_str(key, datetime_to_str(value), no_prefix, retain=retain)
+
+    def publish(
+        self,
+        key: str,
+        value: Publishable,
+        no_prefix: bool = False,
+        *,
+        retain: bool = True,
+    ) -> None:
+        """Dispatch to the appropriate typed publish_* based on value type.
+
+        For callers that hold a `Publishable` without statically knowing
+        which arm of the union it is. `retain` is forwarded to every arm.
+        """
+        # bool must precede int: isinstance(True, int) is True in Python.
+        if isinstance(value, bool):
+            self.publish_bool(key, value, no_prefix, retain=retain)
+        elif isinstance(value, int):
+            self.publish_int(key, value, no_prefix, retain=retain)
+        elif isinstance(value, float):
+            self.publish_float(key, value, no_prefix, retain=retain)
+        elif isinstance(value, str):
+            self.publish_str(key, value, no_prefix, retain=retain)
+        elif isinstance(value, dict):
+            self.publish_json(key, value, no_prefix, retain=retain)
+        elif isinstance(value, datetime):
+            self.publish_datetime(key, value, no_prefix, retain=retain)
+        else:
+            # Defensive: type system rules this out, but `Any` callers can sneak
+            # an unsupported runtime type through; raise rather than silently no-op.
+            msg = f"Unsupported value type: {type(value).__name__}"  # type: ignore[unreachable]
+            raise TypeError(msg)
 
     @abstractmethod
     def clear_topic(self, key: str, no_prefix: bool = False) -> None:
