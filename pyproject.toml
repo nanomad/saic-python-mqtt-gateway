@@ -41,6 +41,7 @@ pytest-asyncio = "^1.2.0"
 pytest-mock = "^3.14.0"
 mypy = "^1.15.0"
 pylint = "^4.0.0"
+pre-commit = "^4.6.0"
 
 [tool.poetry.dependencies]
 saic-ismart-client-ng = { develop = true }

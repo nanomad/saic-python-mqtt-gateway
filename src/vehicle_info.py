@@ -64,15 +64,13 @@ class VehicleInfo:
     def min_ac_temperature(self) -> int:
         if self.series.startswith("EH32"):
             return 17
-        elif self.series.startswith("MZS3E"):
+        if self.series.startswith("MZS3E"):
             return 16
         return 16
 
     @property
     def max_ac_temperature(self) -> int:
-        if self.series.startswith("EH32"):
-            return 31
-        elif self.series.startswith("MZS3E"):
+        if self.series.startswith("EH32") or self.series.startswith("MZS3E"):
             return 31
         return 28
 
