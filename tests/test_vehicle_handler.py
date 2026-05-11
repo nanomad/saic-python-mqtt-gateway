@@ -96,7 +96,7 @@ class TestVehicleHandler(unittest.IsolatedAsyncioTestCase):
         vehicle_info = VehicleInfo(vin_info, None)
         account_prefix = f"/vehicles/{VIN}"
         scheduler = BlockingScheduler()
-        vehicle_state = VehicleState(
+        self.vehicle_state = VehicleState(
             self.publisher, scheduler, account_prefix, vehicle_info
         )
         mock_relogin_handler = ReloginHandler(
@@ -108,7 +108,7 @@ class TestVehicleHandler(unittest.IsolatedAsyncioTestCase):
             self.saicapi,
             self.publisher,
             vehicle_info,
-            vehicle_state,
+            self.vehicle_state,
         )
 
     async def test_update_vehicle_status(self) -> None:
@@ -309,10 +309,6 @@ class TestVehicleHandler(unittest.IsolatedAsyncioTestCase):
             DRIVETRAIN_MILEAGE_SINCE_LAST_CHARGE,
         )
         self.assert_mqtt_topic(
-            TestVehicleHandler.get_topic(mqtt_topics.DRIVETRAIN_SOC_KWH),
-            DRIVETRAIN_SOC_KWH,
-        )
-        self.assert_mqtt_topic(
             TestVehicleHandler.get_topic(mqtt_topics.DRIVETRAIN_CHARGING_TYPE),
             DRIVETRAIN_CHARGING_TYPE,
         )
@@ -359,7 +355,6 @@ class TestVehicleHandler(unittest.IsolatedAsyncioTestCase):
             "/vehicles/vin10000000000000/drivetrain/remainingChargingTime",
             "/vehicles/vin10000000000000/refresh/lastChargeState",
             "/vehicles/vin10000000000000/drivetrain/totalBatteryCapacity",
-            "/vehicles/vin10000000000000/drivetrain/soc_kwh",
             "/vehicles/vin10000000000000/drivetrain/lastChargeEndingPower",
             "/vehicles/vin10000000000000/drivetrain/batteryHeating",
             "/vehicles/vin10000000000000/drivetrain/chargingCableLock",
@@ -396,6 +391,55 @@ class TestVehicleHandler(unittest.IsolatedAsyncioTestCase):
         assert len(common_data) == 0, (
             f"Some topics have been published from both car state and BMS state: {common_data!s}"
         )
+
+    async def test_soc_kwh_published_after_full_cycle(self) -> None:
+        with (
+            patch.object(self.saicapi, "get_vehicle_status") as mock_get_vehicle_status,
+            patch.object(
+                self.saicapi, "get_vehicle_charging_management_data"
+            ) as mock_get_charge,
+        ):
+            mock_get_vehicle_status.return_value = get_mock_vehicle_status_resp()
+            mock_get_charge.return_value = get_mock_charge_management_data_resp()
+
+            _, vehicle_result = await self.vehicle_handler.update_vehicle_status()
+            _, charge_result = await self.vehicle_handler.update_charge_status()
+
+        self.publisher.map.clear()
+        self.vehicle_state.update_data_conflicting_in_vehicle_and_bms(
+            vehicle_result, charge_result
+        )
+
+        self.assert_mqtt_topic(
+            TestVehicleHandler.get_topic(mqtt_topics.DRIVETRAIN_SOC_KWH),
+            DRIVETRAIN_SOC_KWH,
+        )
+
+    async def test_soc_kwh_fallback_when_realtime_power_missing(self) -> None:
+        charge_resp = get_mock_charge_management_data_resp()
+        charge_resp.rvsChargeStatus.realtimePower = None  # type: ignore[union-attr]
+
+        with (
+            patch.object(self.saicapi, "get_vehicle_status") as mock_get_vehicle_status,
+            patch.object(
+                self.saicapi, "get_vehicle_charging_management_data"
+            ) as mock_get_charge,
+        ):
+            mock_get_vehicle_status.return_value = get_mock_vehicle_status_resp()
+            mock_get_charge.return_value = charge_resp
+
+            _, vehicle_result = await self.vehicle_handler.update_vehicle_status()
+            _, charge_result = await self.vehicle_handler.update_charge_status()
+
+        self.publisher.map.clear()
+        self.vehicle_state.update_data_conflicting_in_vehicle_and_bms(
+            vehicle_result, charge_result
+        )
+
+        soc_kwh_topic = TestVehicleHandler.get_topic(mqtt_topics.DRIVETRAIN_SOC_KWH)
+        assert soc_kwh_topic in self.publisher.map
+        # Fallback: DRIVETRAIN_SOC_BMS (96.3%) * 64.0 kWh ≈ 61.6 kWh
+        assert self.publisher.map[soc_kwh_topic] == pytest.approx(61.6, abs=0.1)
 
     def assert_mqtt_topic(self, topic: str, value: Any) -> None:
         mqtt_map = self.publisher.map

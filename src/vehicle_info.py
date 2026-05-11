@@ -64,12 +64,16 @@ class VehicleInfo:
     def min_ac_temperature(self) -> int:
         if self.series.startswith("EH32"):
             return 17
+        elif self.series.startswith("MZS3E"):
+            return 16
         return 16
 
     @property
     def max_ac_temperature(self) -> int:
         if self.series.startswith("EH32"):
-            return 33
+            return 31
+        elif self.series.startswith("MZS3E"):
+            return 31
         return 28
 
     def __get_property_by_code(self, property_name: str) -> str | None:
@@ -122,6 +126,8 @@ class VehicleInfo:
             result = self.__mg5_real_battery_capacity
         elif self.series.startswith("ZS EV"):
             result = self.__zs_ev_real_battery_capacity
+        elif self.series.startswith("MZS3E"):
+            result = self.__mgs5_real_battery_capacity
 
         if result is None:
             LOG.warning(
@@ -140,6 +146,16 @@ class VehicleInfo:
             return 64.0
         # MG4 with LFP battery
         return 51.0
+
+    @property
+    def __mgs5_real_battery_capacity(self) -> float | None:
+        # From the datasheet
+        # Battery pack type 1 (49kWh)
+        # Battery pack type 2 (62.2kWh)
+        # Battery pack type 3 (64kWh)
+        if self.supports_target_soc:
+            return 64.0
+        return 49.0
 
     @property
     def __cyberster_real_battery_capacity(self) -> float | None:
