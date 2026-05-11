@@ -41,6 +41,7 @@ class ChrgMgmtDataRespProcessingResult:
     real_total_battery_capacity: float
     raw_soc: int | None
     raw_fuel_range_elec: int | None
+    soc_kwh: float | None
 
 
 class ChrgMgmtDataRespPublisher(
@@ -110,6 +111,9 @@ class ChrgMgmtDataRespPublisher(
             if chrg_mgmt_data_result is not None
             else None,
             raw_fuel_range_elec=charge_status_result.raw_fuel_range_elec
+            if charge_status_result is not None
+            else None,
+            soc_kwh=charge_status_result.soc_kwh
             if charge_status_result is not None
             else None,
         )

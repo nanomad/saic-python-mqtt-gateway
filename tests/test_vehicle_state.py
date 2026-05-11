@@ -112,6 +112,7 @@ class TestVehicleState(unittest.IsolatedAsyncioTestCase):
             "/vehicles/vin10000000000000/refresh/lastActivity",
             "/vehicles/vin10000000000000/drivetrain/soc",
             "/vehicles/vin10000000000000/drivetrain/range",
+            "/vehicles/vin10000000000000/drivetrain/soc_kwh",
         }
         assert expected_topics == set(self.publisher.map.keys())
 

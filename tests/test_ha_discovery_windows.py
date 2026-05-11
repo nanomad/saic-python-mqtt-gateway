@@ -43,9 +43,7 @@ class TestHaDiscoveryWindows(unittest.TestCase):
         configs = [
             VehicleModelConfiguration("BATTERY", "BATTERY", "1"),
             VehicleModelConfiguration("BType", "Battery", "1"),
-            VehicleModelConfiguration(
-                "S35", "Sunroof", "1" if has_sunroof else "0"
-            ),
+            VehicleModelConfiguration("S35", "Sunroof", "1" if has_sunroof else "0"),
         ]
         vin_info.vehicleModelConfiguration = configs
         vehicle_info = VehicleInfo(vin_info, None)
@@ -97,9 +95,7 @@ class TestHaDiscoveryWindows(unittest.TestCase):
         discovery, publisher = self._make_discovery(has_sunroof=True)
         discovery.publish_ha_discovery_messages()
 
-        sunroof_topic = (
-            f"homeassistant/binary_sensor/{VIN}_mg/{VIN}_sun_roof/config"
-        )
+        sunroof_topic = f"homeassistant/binary_sensor/{VIN}_mg/{VIN}_sun_roof/config"
         assert sunroof_topic in publisher.map
         payload = json.loads(publisher.map[sunroof_topic])
         assert "command_topic" not in payload
@@ -109,9 +105,7 @@ class TestHaDiscoveryWindows(unittest.TestCase):
         discovery, publisher = self._make_discovery(has_sunroof=False)
         discovery.publish_ha_discovery_messages()
 
-        sunroof_binary = (
-            f"homeassistant/binary_sensor/{VIN}_mg/{VIN}_sun_roof/config"
-        )
+        sunroof_binary = f"homeassistant/binary_sensor/{VIN}_mg/{VIN}_sun_roof/config"
         assert sunroof_binary in publisher.map, (
             "Expected unpublish message for binary_sensor Sun roof"
         )

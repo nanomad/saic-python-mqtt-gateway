@@ -15,7 +15,7 @@ from saic_ismart_client_ng.api.vehicle_charging import (
     TargetBatteryCode,
 )
 
-from extractors import extract_electric_range, extract_soc
+from extractors import extract_electric_range, extract_soc, extract_soc_kwh
 import mqtt_topics
 from publisher.core import Publishable
 from status_publisher.charge.chrg_mgmt_data_resp import (
@@ -657,6 +657,13 @@ class VehicleState:
             self.__publish(
                 topic=mqtt_topics.DRIVETRAIN_SOC,
                 value=soc,
+            )
+
+        soc_kwh = extract_soc_kwh(charge_status, soc)
+        if soc_kwh is not None:
+            self.__publish(
+                topic=mqtt_topics.DRIVETRAIN_SOC_KWH,
+                value=soc_kwh,
             )
 
     @property

@@ -21,6 +21,7 @@ LOG = logging.getLogger(__name__)
 class RvsChargeStatusProcessingResult:
     real_total_battery_capacity: float
     raw_fuel_range_elec: int | None
+    soc_kwh: float | None
 
 
 class RvsChargeStatusPublisher(
@@ -38,7 +39,10 @@ class RvsChargeStatusPublisher(
     def _is_valid_partial_mileage(self, raw_value: int) -> bool:
         if not value_in_range(raw_value, 0, 65535):
             return False
-        if self._last_total_mileage_raw is not None and raw_value > self._last_total_mileage_raw:
+        if (
+            self._last_total_mileage_raw is not None
+            and raw_value > self._last_total_mileage_raw
+        ):
             LOG.warning(
                 "Partial mileage %d exceeds total mileage %d, skipping",
                 raw_value,
@@ -98,13 +102,13 @@ class RvsChargeStatusPublisher(
             validator=lambda x: x > 0,
         )
 
-        self._transform_and_publish(
-            topic=mqtt_topics.DRIVETRAIN_SOC_KWH,
-            value=charge_status.realtimePower,
-            transform=lambda p: round(
-                (battery_capacity_correction_factor * p) / 10.0, 2
-            ),
-        )
+        soc_kwh: float | None = None
+        if charge_status.realtimePower:
+            soc_kwh = round(
+                (battery_capacity_correction_factor * charge_status.realtimePower)
+                / 10.0,
+                2,
+            )
 
         self._transform_and_publish(
             topic=mqtt_topics.DRIVETRAIN_LAST_CHARGE_ENDING_POWER,
@@ -136,6 +140,7 @@ class RvsChargeStatusPublisher(
         return RvsChargeStatusProcessingResult(
             real_total_battery_capacity=real_total_battery_capacity,
             raw_fuel_range_elec=charge_status.fuelRangeElec,
+            soc_kwh=soc_kwh,
         )
 
     def get_actual_battery_capacity(
