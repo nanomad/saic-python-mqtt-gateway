@@ -149,12 +149,11 @@ class VehicleInfo:
 
     @property
     def __mg4_urban_real_battery_capacity(self) -> float | None:
-        # MG4 Urban Standard Range (LFP, 43kWh) — series AH4EM L
-        # Long Range (LFP, 54kWh) also uses LFP so supports_target_soc is False for both;
-        # return None until a series code for the 54kWh variant is confirmed.
+        # MG4 Urban: "L" suffix = low/standard trim (43kWh LFP, series AH4EM L)
+        # All other variants (e.g. AH4EM S) default to 54kWh LFP
         if self.series == "AH4EM L":
             return 43.0
-        return None
+        return 54.0
 
     @property
     def __mgs5_real_battery_capacity(self) -> float | None:

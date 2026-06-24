@@ -39,10 +39,9 @@ class TestMg4UrbanRealBatteryCapacity:
     def test_standard_range_43kwh(self) -> None:
         assert _make_vehicle_info("AH4EM L", model="MG4 EV URBAN").real_battery_capacity == 43.0
 
-    def test_unknown_urban_variant_returns_none(self) -> None:
-        # 54kWh Long Range series code not yet confirmed — should return None until a
-        # real device report is available so the user is prompted to set a custom capacity.
-        assert _make_vehicle_info("AH4EM LL", model="MG4 EV URBAN LR").real_battery_capacity is None
+    def test_long_range_54kwh(self) -> None:
+        # AH4EM S = Long Range (54kWh LFP), confirmed via issue #452
+        assert _make_vehicle_info("AH4EM S", model="MG4 EV URBAN").real_battery_capacity == 54.0
 
     def test_custom_capacity_overrides_lookup(self) -> None:
         vi = _make_vehicle_info("AH4EM L", model="MG4 EV URBAN", custom_battery_capacity=54.0)
