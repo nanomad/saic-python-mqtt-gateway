@@ -1,14 +1,27 @@
 # Change Log
 
-## Unreleased
+## 0.12.0
 
 ### Added
 
 * Add `--saic-user-timezone` / `SAIC_USER_TIMEZONE` config option to force
   the account timezone instead of relying on the SAIC API value. Useful when
-  the API reports a wrong DST offset (#438). Discrepancies between the forced
+  the API reports a wrong DST offset (#444). Discrepancies between the forced
   zone and the API value are detected by comparing the current UTC offset and
   logged at WARNING level.
+
+* Add SoC kWh fallback for vehicles that do not report `realtimePower`: the
+  gateway now estimates energy consumed from the SoC delta and battery
+  capacity so the kWh sensors remain populated even without live power data
+  (#448).
+
+* Add battery capacity support for MG4 Urban (AH4EM series) (#455).
+
+* Default MG4 Urban non-Long-Range variants to 54 kWh when no custom override
+  is configured (#452).
+
+* Home Assistant SoC icon now dynamically reflects the charging state
+  (charging / discharging / idle) (#458).
 
 ### Fixed
 
@@ -22,7 +35,10 @@
 
   Note: on first upgrade only entities you change *after* the upgrade become
   persistent. Existing retained STATE values on the broker are not converted
-  into retained `/set` commands.
+  into retained `/set` commands. (#441)
+
+* Forward the retain flag through all typed publish methods so that retained
+  state is correctly preserved on the broker across reconnects (#443).
 
 * Republish the effective Total Battery Capacity to its state topic right after
   the user updates the HA number. The `_set` handler used to only mutate the
@@ -30,7 +46,9 @@
   sensor topic, leaving the HA sensor stuck on the previous (often hardcoded
   per-model default) value while the number widget already showed the new
   setting. A payload of `0` re-publishes the per-model default via
-  `real_battery_capacity`.
+  `real_battery_capacity` (#445).
+
+**Full Changelog**: https://github.com/SAIC-iSmart-API/saic-python-mqtt-gateway/compare/0.11.0...0.12.0
 
 ## 0.11.0
 
