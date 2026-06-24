@@ -118,6 +118,8 @@ class VehicleInfo:
 
         if self.series.startswith("EH32"):
             result = self.__mg4_real_battery_capacity
+        elif self.series.startswith("AH4EM"):
+            result = self.__mg4_urban_real_battery_capacity
         elif self.series.startswith("EC32"):
             result = self.__cyberster_real_battery_capacity
         elif self.series.startswith("EP2"):
@@ -144,6 +146,15 @@ class VehicleInfo:
             return 64.0
         # MG4 with LFP battery
         return 51.0
+
+    @property
+    def __mg4_urban_real_battery_capacity(self) -> float | None:
+        # MG4 Urban Standard Range (LFP, 43kWh) — series AH4EM L
+        # Long Range (LFP, 54kWh) also uses LFP so supports_target_soc is False for both;
+        # return None until a series code for the 54kWh variant is confirmed.
+        if self.series == "AH4EM L":
+            return 43.0
+        return None
 
     @property
     def __mgs5_real_battery_capacity(self) -> float | None:
