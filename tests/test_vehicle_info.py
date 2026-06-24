@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 from saic_ismart_client_ng.api.vehicle.schema import VehicleModelConfiguration, VinInfo
 
 from tests.common_mocks import VIN
@@ -32,17 +31,27 @@ class TestMg4RealBatteryCapacity:
         assert _make_vehicle_info("EH32 S", btype="1").real_battery_capacity == 64.0
 
     def test_mg4_trophy_extended_range_77kwh(self) -> None:
-        assert _make_vehicle_info("EH32 S", model="EH32 X3").real_battery_capacity == 77.0
+        assert (
+            _make_vehicle_info("EH32 S", model="EH32 X3").real_battery_capacity == 77.0
+        )
 
 
 class TestMg4UrbanRealBatteryCapacity:
     def test_standard_range_43kwh(self) -> None:
-        assert _make_vehicle_info("AH4EM L", model="MG4 EV URBAN").real_battery_capacity == 43.0
+        assert (
+            _make_vehicle_info("AH4EM L", model="MG4 EV URBAN").real_battery_capacity
+            == 43.0
+        )
 
     def test_long_range_54kwh(self) -> None:
         # AH4EM S = Long Range (54kWh LFP), confirmed via issue #452
-        assert _make_vehicle_info("AH4EM S", model="MG4 EV URBAN").real_battery_capacity == 54.0
+        assert (
+            _make_vehicle_info("AH4EM S", model="MG4 EV URBAN").real_battery_capacity
+            == 54.0
+        )
 
     def test_custom_capacity_overrides_lookup(self) -> None:
-        vi = _make_vehicle_info("AH4EM L", model="MG4 EV URBAN", custom_battery_capacity=54.0)
+        vi = _make_vehicle_info(
+            "AH4EM L", model="MG4 EV URBAN", custom_battery_capacity=54.0
+        )
         assert vi.real_battery_capacity == 54.0
